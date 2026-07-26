@@ -1,0 +1,19 @@
+Metadata-Version: 2.4
+Name: weatherprediction
+Version: 0.0.1
+Summary: Weather Prediction MLOps Pipeline — Rain Tomorrow Classifier
+Author: T Ganesh
+Requires-Python: >=3.8
+Requires-Dist: numpy
+Requires-Dist: pandas
+Requires-Dist: scikit-learn
+Requires-Dist: catboost
+Requires-Dist: xgboost
+Requires-Dist: flask
+Requires-Dist: seaborn
+Requires-Dist: matplotlib
+Requires-Dist: dill
+Dynamic: author
+Dynamic: requires-dist
+Dynamic: requires-python
+Dynamic: summary

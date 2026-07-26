@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AccuWeather — Superior Accuracy™ | Weather Forecasts & Maps</title>
+  <meta name="description" content="Get the most accurate local weather forecasts, hourly, 10-day, and minute-by-minute rain predictions powered by AccuWeather's Superior Accuracy™ technology." />
+  <link rel="stylesheet" href="/static/css/style.css" />
+</head>
+<body>
+
+  <!-- ── Top Bar ─────────────────────────────────────────────────────────── -->
+  <div class="topbar">
+    <a href="/" class="topbar-brand">
+      <div class="topbar-logo-icon">🌤</div>
+      <span class="topbar-logo-text"><span>Accu</span>Weather</span>
+    </a>
+    <a class="topbar-item active" href="#">For Business</a>
+    <span class="topbar-sep">|</span>
+    <a class="topbar-item" href="#">Warnings</a>
+    <a class="topbar-item" href="#">Data Suite</a>
+    <a class="topbar-item" href="#">Forensics</a>
+    <a class="topbar-item" href="#">Advertising</a>
+    <a class="topbar-item" href="#">Superior Accuracy™</a>
+  </div>
+
+  <!-- ── Main Navbar ─────────────────────────────────────────────────────── -->
+  <nav class="navbar">
+    <a href="/" class="navbar-brand">
+      <div class="navbar-logo-icon">🌤</div>
+      <span class="navbar-logo-text"><span>Accu</span>Weather</span>
+    </a>
+    <button class="navbar-menu-btn" aria-label="Menu" id="menu-btn">
+      <span></span><span></span><span></span>
+    </button>
+  </nav>
+
+  <!-- ── Hero ───────────────────────────────────────────────────────────── -->
+  <section class="hero" id="hero">
+    <div class="hero-sky" id="hero-sky"></div>
+    <div class="hero-clouds">
+      <div class="cloud cloud-1"></div>
+      <div class="cloud cloud-2"></div>
+      <div class="cloud cloud-3"></div>
+      <div class="cloud cloud-4"></div>
+    </div>
+    <div class="hero-sun"></div>
+    <div class="hero-overlay"></div>
+
+    <div class="hero-content">
+      <!-- Search Box -->
+      <div style="position:relative;">
+        <div class="search-box" id="search-box">
+          <span class="search-icon">🔍</span>
+          <input
+            type="text"
+            class="search-input"
+            id="search-input"
+            placeholder="Search city or location..."
+            autocomplete="off"
+            aria-label="Search city"
+          />
+          <div class="search-divider"></div>
+          <button class="search-location-btn" id="geo-btn" title="Use my location">
+            📍 Location
+          </button>
+        </div>
+        <div class="search-dropdown" id="search-dropdown"></div>
+      </div>
+
+      <!-- Recent Locations -->
+      <div class="recent-locations" id="recent-locations">
+        <div class="recent-label">Recent Locations</div>
+        <div class="recent-cards" id="recent-cards">
+          <!-- Populated by JS -->
+          <a href="/weather?city=Kavali" class="recent-card">
+            <div class="recent-city">Kavali</div>
+            <div class="recent-country">India</div>
+            <div class="recent-temp-row">
+              <span class="recent-icon">⛅</span>
+              <span class="recent-temp">35°</span>
+            </div>
+            <div class="recent-realfeel">RealFeel® 38°</div>
+          </a>
+          <a href="/weather?city=Madanapalle" class="recent-card">
+            <div class="recent-city">Madanapalle</div>
+            <div class="recent-country">India</div>
+            <div class="recent-temp-row">
+              <span class="recent-icon">🌥</span>
+              <span class="recent-temp">31°</span>
+            </div>
+            <div class="recent-realfeel">RealFeel® 30°</div>
+          </a>
+          <a href="/weather?city=London" class="recent-card">
+            <div class="recent-city">London</div>
+            <div class="recent-country">GB</div>
+            <div class="recent-temp-row">
+              <span class="recent-icon">🌦</span>
+              <span class="recent-temp">18°</span>
+            </div>
+            <div class="recent-realfeel">RealFeel® 16°</div>
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Feature Banner ─────────────────────────────────────────────────── -->
+  <section class="home-section-dark">
+    <div class="container">
+
+      <div class="feature-banner fade-in-up">
+        <div class="feature-banner-text">
+          <h2>🤖 AI Rain Prediction</h2>
+          <p>Run our CatBoost ML model — 85%+ accuracy predicting tomorrow's rain.</p>
+        </div>
+        <a href="/predict-form" class="feature-banner-btn" title="Try ML Predictor">›</a>
+      </div>
+
+      <!-- Feature Cards -->
+      <div class="features-grid">
+        <a href="/weather?city=New York" class="feature-card fade-in-up delay-1">
+          <div class="feature-card-icon">⏱</div>
+          <div class="feature-card-title">MinuteCast®</div>
+          <div class="feature-card-desc">Minute-by-minute precipitation for your exact location.</div>
+        </a>
+        <a href="/weather?city=Tokyo" class="feature-card fade-in-up delay-2">
+          <div class="feature-card-icon">📡</div>
+          <div class="feature-card-title">Live Radar Maps</div>
+          <div class="feature-card-desc">Interactive radar with wind, precipitation, and temperature overlays.</div>
+        </a>
+        <a href="/weather?city=Paris" class="feature-card fade-in-up delay-3">
+          <div class="feature-card-icon">🌬</div>
+          <div class="feature-card-title">Air Quality Index</div>
+          <div class="feature-card-desc">Real-time AQI with PM2.5, ozone, and CO measurements.</div>
+        </a>
+        <a href="/weather?city=Sydney" class="feature-card fade-in-up delay-4">
+          <div class="feature-card-icon">📅</div>
+          <div class="feature-card-title">7-Day Forecast</div>
+          <div class="feature-card-desc">Hourly and daily forecasts with RealFeel® temperature data.</div>
+        </a>
+      </div>
+
+      <!-- Explore Cities -->
+      <h2 class="section-heading">🌍 Explore Cities</h2>
+      <div class="city-grid" id="city-grid">
+        <a href="/weather?city=Mumbai" class="city-card">
+          <div class="city-card-name">Mumbai</div>
+          <div class="city-card-country">🇮🇳 India</div>
+          <div class="city-card-temp">32°</div>
+          <div class="city-card-desc">Partly Cloudy</div>
+        </a>
+        <a href="/weather?city=Delhi" class="city-card">
+          <div class="city-card-name">Delhi</div>
+          <div class="city-card-country">🇮🇳 India</div>
+          <div class="city-card-temp">38°</div>
+          <div class="city-card-desc">Hot & Sunny</div>
+        </a>
+        <a href="/weather?city=Bangalore" class="city-card">
+          <div class="city-card-name">Bangalore</div>
+          <div class="city-card-country">🇮🇳 India</div>
+          <div class="city-card-temp">28°</div>
+          <div class="city-card-desc">Thunderstorm</div>
+        </a>
+        <a href="/weather?city=Hyderabad" class="city-card">
+          <div class="city-card-name">Hyderabad</div>
+          <div class="city-card-country">🇮🇳 India</div>
+          <div class="city-card-temp">33°</div>
+          <div class="city-card-desc">Mostly Cloudy</div>
+        </a>
+        <a href="/weather?city=New York" class="city-card">
+          <div class="city-card-name">New York</div>
+          <div class="city-card-country">🇺🇸 USA</div>
+          <div class="city-card-temp">24°</div>
+          <div class="city-card-desc">Sunny</div>
+        </a>
+        <a href="/weather?city=London" class="city-card">
+          <div class="city-card-name">London</div>
+          <div class="city-card-country">🇬🇧 UK</div>
+          <div class="city-card-temp">17°</div>
+          <div class="city-card-desc">Overcast</div>
+        </a>
+        <a href="/weather?city=Tokyo" class="city-card">
+          <div class="city-card-name">Tokyo</div>
+          <div class="city-card-country">🇯🇵 Japan</div>
+          <div class="city-card-temp">29°</div>
+          <div class="city-card-desc">Humid & Warm</div>
+        </a>
+        <a href="/weather?city=Dubai" class="city-card">
+          <div class="city-card-name">Dubai</div>
+          <div class="city-card-country">🇦🇪 UAE</div>
+          <div class="city-card-temp">42°</div>
+          <div class="city-card-desc">Scorching Hot</div>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Footer ──────────────────────────────────────────────────────────── -->
+  <footer class="footer">
+    <p>© 2025 AccuWeather Clone &nbsp;·&nbsp; Powered by <a href="https://openweathermap.org" target="_blank">OpenWeatherMap</a> &nbsp;·&nbsp; ML by <a href="/predict-form">CatBoost</a></p>
+  </footer>
+
+  <script src="/static/js/app.js"></script>
+</body>
+</html>

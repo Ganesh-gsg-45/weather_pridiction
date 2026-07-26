@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Rain Predictor — AccuWeather Clone</title>
+  <meta name="description" content="Use our CatBoost machine learning model to predict whether it will rain tomorrow based on today's weather readings." />
+  <link rel="stylesheet" href="/static/css/style.css" />
+  <style>
+    body { background: var(--navy); padding: 0; }
+
+    .predict-hero {
+      background: linear-gradient(135deg, rgba(244,121,33,0.15) 0%, rgba(11,26,46,0) 60%);
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      padding: 2rem 2rem 1.5rem;
+      text-align: center;
+    }
+    .predict-hero h1 {
+      font-size: clamp(1.6rem, 4vw, 2.2rem);
+      font-weight: 900;
+      background: linear-gradient(135deg, var(--orange) 0%, #fbbf24 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 0.4rem;
+    }
+    .predict-hero p { color: var(--text-muted); font-size: 0.95rem; }
+    .predict-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      margin-top: 0.75rem;
+      padding: 0.3rem 1rem;
+      background: rgba(244,121,33,0.12);
+      border: 1px solid rgba(244,121,33,0.3);
+      border-radius: 999px;
+      font-size: 0.78rem;
+      color: var(--orange);
+      font-weight: 600;
+    }
+
+    .predict-body {
+      max-width: 960px;
+      margin: 2rem auto;
+      padding: 0 1.5rem 3rem;
+    }
+
+    .form-card {
+      background: var(--glass-bg);
+      backdrop-filter: var(--glass-blur);
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius-xl);
+      padding: 2rem 2.5rem;
+      box-shadow: var(--shadow-card);
+    }
+
+    .section-title {
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin: 1.75rem 0 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid var(--card-border);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .section-title:first-child { margin-top: 0; }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem 1.5rem;
+    }
+
+    .field { display: flex; flex-direction: column; gap: 0.4rem; }
+    .field label { font-size: 0.82rem; font-weight: 500; color: var(--text-muted); }
+    .field input, .field select {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      font-family: inherit;
+      font-size: 0.92rem;
+      padding: 0.65rem 0.9rem;
+      transition: border-color var(--transition), box-shadow var(--transition);
+      outline: none;
+      width: 100%;
+    }
+    .field input:focus, .field select:focus {
+      border-color: var(--orange);
+      box-shadow: 0 0 0 3px var(--orange-glow);
+    }
+    .field input::placeholder { color: rgba(255,255,255,0.25); }
+    .field select option { background: #1a2035; color: var(--text); }
+
+    .btn-wrap { margin-top: 2.25rem; text-align: center; }
+    .btn-predict {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: linear-gradient(135deg, var(--orange) 0%, #d4631a 100%);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius-md);
+      font-family: inherit;
+      font-size: 1rem;
+      font-weight: 700;
+      padding: 0.9rem 2.8rem;
+      cursor: pointer;
+      box-shadow: 0 4px 24px var(--orange-glow);
+      transition: transform var(--transition), box-shadow var(--transition), filter var(--transition);
+    }
+    .btn-predict:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 8px 32px rgba(244,121,33,0.5);
+      filter: brightness(1.08);
+    }
+    .btn-predict:active { transform: translateY(0); }
+    .predict-icon { font-size: 1.2rem; animation: float 3s ease-in-out infinite; }
+    @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-5px)} }
+
+    @media (max-width:600px) { .form-card { padding:1.5rem 1rem; } }
+  </style>
+</head>
+<body>
+
+  <!-- ── Topbar ──────────────────────────────────────────────────────────── -->
+  <div class="topbar">
+    <a class="topbar-item" href="/">← AccuWeather Home</a>
+    <span class="topbar-sep">|</span>
+    <a class="topbar-item active" href="#">AI Rain Predictor</a>
+    <a class="topbar-item" href="#">Superior Accuracy™</a>
+  </div>
+
+  <!-- ── Navbar ─────────────────────────────────────────────────────────── -->
+  <nav class="navbar">
+    <a href="/" class="navbar-brand">
+      <div class="navbar-logo-icon">🌤</div>
+      <span class="navbar-logo-text"><span>Accu</span>Weather</span>
+    </a>
+    <a href="/" class="back-link" style="color:var(--text-muted);">← Back to Weather</a>
+  </nav>
+
+  <!-- ── Hero ───────────────────────────────────────────────────────────── -->
+  <div class="predict-hero">
+    <h1>🤖 AI Rain Predictor</h1>
+    <p>Enter today's weather readings to predict if it will rain tomorrow.</p>
+    <div class="predict-badge">⚡ Powered by CatBoost · 85%+ Accuracy · 145K Training Rows</div>
+  </div>
+
+  <!-- ── Form ───────────────────────────────────────────────────────────── -->
+  <div class="predict-body">
+    <div class="form-card">
+      <form action="/predict" method="POST">
+
+        <!-- Temperature -->
+        <p class="section-title">🌡 Temperature</p>
+        <div class="grid">
+          <div class="field">
+            <label for="min_temp">Min Temp (°C)</label>
+            <input type="number" id="min_temp" name="min_temp" step="0.1" placeholder="e.g. 13.4" required />
+          </div>
+          <div class="field">
+            <label for="max_temp">Max Temp (°C)</label>
+            <input type="number" id="max_temp" name="max_temp" step="0.1" placeholder="e.g. 22.9" required />
+          </div>
+          <div class="field">
+            <label for="temp_9am">Temp at 9am (°C)</label>
+            <input type="number" id="temp_9am" name="temp_9am" step="0.1" placeholder="e.g. 16.9" required />
+          </div>
+          <div class="field">
+            <label for="temp_3pm">Temp at 3pm (°C)</label>
+            <input type="number" id="temp_3pm" name="temp_3pm" step="0.1" placeholder="e.g. 21.8" required />
+          </div>
+        </div>
+
+        <!-- Rainfall & Sunshine -->
+        <p class="section-title">🌧 Rainfall & Sunshine</p>
+        <div class="grid">
+          <div class="field">
+            <label for="rainfall">Rainfall (mm)</label>
+            <input type="number" id="rainfall" name="rainfall" step="0.1" min="0" placeholder="e.g. 0.6" required />
+          </div>
+          <div class="field">
+            <label for="evaporation">Evaporation (mm)</label>
+            <input type="number" id="evaporation" name="evaporation" step="0.1" min="0" placeholder="e.g. 4.8" required />
+          </div>
+          <div class="field">
+            <label for="sunshine">Sunshine (hours)</label>
+            <input type="number" id="sunshine" name="sunshine" step="0.1" min="0" max="14.5" placeholder="e.g. 8.4" required />
+          </div>
+          <div class="field">
+            <label for="rain_today">Did it Rain Today?</label>
+            <select id="rain_today" name="rain_today" required>
+              <option value="" disabled selected>Select…</option>
+              <option value="0">No</option>
+              <option value="1">Yes</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Wind -->
+        <p class="section-title">💨 Wind</p>
+        <div class="grid">
+          <div class="field">
+            <label for="wind_gust_speed">Wind Gust Speed (km/h)</label>
+            <input type="number" id="wind_gust_speed" name="wind_gust_speed" step="0.1" min="0" placeholder="e.g. 44.0" required />
+          </div>
+          <div class="field">
+            <label for="wind_speed_9am">Wind Speed at 9am (km/h)</label>
+            <input type="number" id="wind_speed_9am" name="wind_speed_9am" step="0.1" min="0" placeholder="e.g. 20.0" required />
+          </div>
+          <div class="field">
+            <label for="wind_speed_3pm">Wind Speed at 3pm (km/h)</label>
+            <input type="number" id="wind_speed_3pm" name="wind_speed_3pm" step="0.1" min="0" placeholder="e.g. 24.0" required />
+          </div>
+        </div>
+
+        <!-- Humidity & Pressure -->
+        <p class="section-title">💧 Humidity & Pressure</p>
+        <div class="grid">
+          <div class="field">
+            <label for="humidity_9am">Humidity at 9am (%)</label>
+            <input type="number" id="humidity_9am" name="humidity_9am" step="0.1" min="0" max="100" placeholder="e.g. 71.0" required />
+          </div>
+          <div class="field">
+            <label for="humidity_3pm">Humidity at 3pm (%)</label>
+            <input type="number" id="humidity_3pm" name="humidity_3pm" step="0.1" min="0" max="100" placeholder="e.g. 22.0" required />
+          </div>
+          <div class="field">
+            <label for="pressure_9am">Pressure at 9am (hPa)</label>
+            <input type="number" id="pressure_9am" name="pressure_9am" step="0.1" placeholder="e.g. 1007.7" required />
+          </div>
+          <div class="field">
+            <label for="pressure_3pm">Pressure at 3pm (hPa)</label>
+            <input type="number" id="pressure_3pm" name="pressure_3pm" step="0.1" placeholder="e.g. 1007.1" required />
+          </div>
+        </div>
+
+        <!-- Date -->
+        <p class="section-title">📅 Date</p>
+        <div class="grid">
+          <div class="field">
+            <label for="day">Day</label>
+            <input type="number" id="day" name="day" min="1" max="31" placeholder="e.g. 1" required />
+          </div>
+          <div class="field">
+            <label for="month">Month</label>
+            <input type="number" id="month" name="month" min="1" max="12" placeholder="e.g. 12" required />
+          </div>
+          <div class="field">
+            <label for="year">Year</label>
+            <input type="number" id="year" name="year" min="2008" max="2030" placeholder="e.g. 2024" required />
+          </div>
+        </div>
+
+        <div class="btn-wrap">
+          <button type="submit" class="btn-predict">
+            <span class="predict-icon">🌧</span> Predict Rain Tomorrow
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <footer class="footer">
+    <p>© 2025 AccuWeather Clone · <a href="/">Home</a> · <a href="/weather?city=Hyderabad">Live Weather</a></p>
+  </footer>
+
+</body>
+</html>

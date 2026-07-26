@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Prediction Result — Weather Prediction</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:      #0d1117;
+      --card:    #1c2230;
+      --border:  #30363d;
+      --text:    #e6edf3;
+      --muted:   #8b949e;
+      --radius:  16px;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem 1rem;
+    }
+
+    /* ── Result card ───────────────────────────────────────────────────────── */
+    .result-card {
+      max-width: 520px;
+      width: 100%;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 3rem 2.5rem;
+      text-align: center;
+      box-shadow: 0 12px 50px rgba(0,0,0,0.5);
+      animation: slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(30px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── Icon ──────────────────────────────────────────────────────────────── */
+    .result-icon {
+      font-size: 5rem;
+      line-height: 1;
+      margin-bottom: 1.25rem;
+      animation: pulse 2s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50%       { transform: scale(1.08); }
+    }
+
+    /* ── Label ─────────────────────────────────────────────────────────────── */
+    .result-label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 0.6rem;
+    }
+
+    /* ── Main prediction text ──────────────────────────────────────────────── */
+    .result-text {
+      font-size: clamp(2rem, 6vw, 2.8rem);
+      font-weight: 800;
+      line-height: 1.15;
+      margin-bottom: 1rem;
+    }
+    .result-text.rain {
+      background: linear-gradient(135deg, #58a6ff 0%, #79c0ff 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .result-text.no-rain {
+      background: linear-gradient(135deg, #f0b429 0%, #f6e05e 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    /* ── Sub-text ──────────────────────────────────────────────────────────── */
+    .result-sub {
+      font-size: 0.95rem;
+      color: var(--muted);
+      margin-bottom: 2rem;
+      line-height: 1.5;
+    }
+
+    /* ── Divider ───────────────────────────────────────────────────────────── */
+    .divider {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 0 0 2rem;
+    }
+
+    /* ── Stats strip ───────────────────────────────────────────────────────── */
+    .stats {
+      display: flex;
+      justify-content: center;
+      gap: 2rem;
+      margin-bottom: 2rem;
+    }
+    .stat { text-align: center; }
+    .stat-value {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .stat-label {
+      font-size: 0.72rem;
+      color: var(--muted);
+      margin-top: 0.2rem;
+    }
+
+    /* ── Back button ───────────────────────────────────────────────────────── */
+    .btn-back {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 0.9rem;
+      font-weight: 500;
+      padding: 0.7rem 1.8rem;
+      cursor: pointer;
+      text-decoration: none;
+      transition: border-color 0.2s, background 0.2s, transform 0.2s;
+    }
+    .btn-back:hover {
+      border-color: #58a6ff;
+      background: rgba(88, 166, 255, 0.08);
+      transform: translateY(-2px);
+    }
+
+    /* ── Glow ring around card ─────────────────────────────────────────────── */
+    .glow-rain  { box-shadow: 0 0 60px rgba(88, 166, 255, 0.18), 0 12px 50px rgba(0,0,0,0.5); }
+    .glow-sun   { box-shadow: 0 0 60px rgba(240, 180, 41, 0.18), 0 12px 50px rgba(0,0,0,0.5); }
+  </style>
+</head>
+<body>
+
+  {% if prediction == "Yes" %}
+  <!-- ── Rain result ──────────────────────────────────────────────────────── -->
+  <div class="result-card glow-rain">
+    <div class="result-icon">🌧</div>
+    <p class="result-label">Tomorrow's Forecast</p>
+    <p class="result-text rain">Yes, It Will Rain!</p>
+    <p class="result-sub">
+      Our model predicts rain tomorrow.<br/>
+      Don't forget your umbrella! ☂️
+    </p>
+
+    <hr class="divider" />
+
+    <div class="stats">
+      <div class="stat">
+        <div class="stat-value">85%+</div>
+        <div class="stat-label">Model Accuracy</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value">CatBoost</div>
+        <div class="stat-label">Best Model</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value">145K</div>
+        <div class="stat-label">Training Rows</div>
+      </div>
+    </div>
+
+    <a href="/" class="btn-back">← Make Another Prediction</a>
+  </div>
+
+  {% else %}
+  <!-- ── No Rain result ──────────────────────────────────────────────────── -->
+  <div class="result-card glow-sun">
+    <div class="result-icon">☀️</div>
+    <p class="result-label">Tomorrow's Forecast</p>
+    <p class="result-text no-rain">No Rain Tomorrow!</p>
+    <p class="result-sub">
+      Our model predicts a dry day tomorrow.<br/>
+      Enjoy the sunshine! 😎
+    </p>
+
+    <hr class="divider" />
+
+    <div class="stats">
+      <div class="stat">
+        <div class="stat-value">85%+</div>
+        <div class="stat-label">Model Accuracy</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value">CatBoost</div>
+        <div class="stat-label">Best Model</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value">145K</div>
+        <div class="stat-label">Training Rows</div>
+      </div>
+    </div>
+
+    <a href="/" class="btn-back">← Make Another Prediction</a>
+  </div>
+  {% endif %}
+
+</body>
+</html>
