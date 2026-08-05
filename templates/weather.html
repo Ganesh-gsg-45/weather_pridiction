@@ -3,55 +3,31 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>{{ city }}, {{ country }} Weather Forecast | AccuWeather Clone</title>
-  <meta name="description" content="Current weather and 7-day forecast for {{ city }}, {{ country }}. Temperature: {{ temp }}°C, {{ description }}." />
+  <title>{{ city }}, {{ country }} Weather | GOOD WEATHER</title>
+  <meta name="description" content="Current weather and 5-day forecast for {{ city }}, {{ country }}. Temperature: {{ temp }}°C, {{ description }}." />
+  <link rel="icon" type="image/svg+xml" href="/static/images/favicon.svg" />
   <link rel="stylesheet" href="/static/css/style.css" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <style>
-    /* Page-specific tweaks */
-    body { background: linear-gradient(160deg, #0b1a2e 0%, #0a1628 60%, #071020 100%); }
-    .leaflet-container { background: #0a1628; }
-  </style>
 </head>
-<body class="dashboard">
+<body class="msn-body">
 
-  <!-- ── Top Bar ────────────────────────────────────────────────────────── -->
-  <div class="topbar">
-    <a href="/" class="topbar-brand">
-      <div class="topbar-logo-icon">🌤</div>
-      <span class="topbar-logo-text"><span>Accu</span>Weather</span>
-    </a>
-    <a class="topbar-item active" href="#">For Business</a>
-    <span class="topbar-sep">|</span>
-    <a class="topbar-item" href="#">Warnings</a>
-    <a class="topbar-item" href="#">Data Suite</a>
-    <a class="topbar-item" href="#">Forensics</a>
-    <a class="topbar-item" href="#">Advertising</a>
-    <a class="topbar-item" href="#">Superior Accuracy™</a>
-  </div>
-
-  <!-- ── Main Navbar ────────────────────────────────────────────────────── -->
+  <!-- ── Sticky Navbar ──────────────────────────────────────────────────── -->
   <nav class="navbar">
     <a href="/" class="navbar-brand">
-      <div class="navbar-logo-icon">🌤</div>
-      <span class="navbar-logo-text"><span>Accu</span>Weather</span>
+      <img src="/static/images/logo.svg" alt="GOOD WEATHER" style="height:32px;" />
     </a>
-    <!-- Mini search in nav -->
     <div style="position:relative; flex:1; max-width:400px; margin:0 1.5rem;">
       <div class="search-box" style="height:40px;">
         <span class="search-icon" style="font-size:0.9rem;">🔍</span>
-        <input type="text" class="search-input" id="nav-search" placeholder="Search city..." autocomplete="off" style="font-size:0.9rem;" />
+        <input type="text" class="search-input" id="nav-search" placeholder="Search city…" autocomplete="off" style="font-size:0.9rem;" />
       </div>
       <div class="search-dropdown" id="nav-search-dropdown"></div>
     </div>
-    <button class="navbar-menu-btn" aria-label="Menu">
-      <span></span><span></span><span></span>
-    </button>
+    <a href="/predict-form" class="btn-ml" style="white-space:nowrap;">🤖 Predict Rain</a>
   </nav>
 
   {% if error is defined and error %}
-  <!-- ── Error State ─────────────────────────────────────────────────── -->
-  <div class="dashboard-body">
+  <!-- ── Error State ──────────────────────────────────────────────────── -->
+  <div class="msn-layout" style="padding-top:4rem;">
     <div class="error-center">
       <div class="error-icon">🌩</div>
       <div class="error-title">Location Not Found</div>
@@ -61,36 +37,30 @@
   </div>
 
   {% else %}
-  <!-- ── Dashboard Header ───────────────────────────────────────────── -->
-  <div class="dashboard-header">
-    <div class="dashboard-header-inner">
-      <div>
-        <a href="/" class="back-link">← AccuWeather Home</a>
-        <div class="location-info">
-          <div class="city-name">{{ city }}, {{ country }}</div>
-          <div class="location-detail">
-            Lat {{ "%.2f"|format(lat) }}° · Lon {{ "%.2f"|format(lon) }}°
-          </div>
-          <div class="location-time" id="local-time">Loading local time…</div>
-        </div>
-      </div>
-      <a href="/predict-form" class="btn-ml">
-        🤖 Predict Rain Tomorrow
-      </a>
+  <!-- ══════════════════════════════════════════════════════════════════════
+       MSN WEATHER SINGLE-PAGE LAYOUT
+       ══════════════════════════════════════════════════════════════════════ -->
+  <div class="msn-layout">
+
+    <!-- ── Location Breadcrumb ─────────────────────────────────────────── -->
+    <div class="msn-breadcrumb">
+      <a href="/" class="back-link">← GOOD WEATHER</a>
+      <span class="msn-breadcrumb-sep">›</span>
+      <span>{{ city }}, {{ country }}</span>
     </div>
-  </div>
 
-  <!-- ── Dashboard Body ─────────────────────────────────────────────── -->
-  <div class="dashboard-body">
-    <div class="dashboard-grid">
+    <!-- ══════════════════════════════════════════════════════════════════
+         SECTION 1: HERO CARD — Current Conditions
+         ══════════════════════════════════════════════════════════════════ -->
+    <section class="msn-hero-card fade-in-up" id="current">
 
-      <!-- LEFT COLUMN -->
-      <div class="dashboard-left">
+      <!-- Left: Big temp block -->
+      <div class="msn-hero-left">
+        <div class="msn-city-label">{{ city }}, {{ country }}</div>
+        <div class="msn-local-time" id="local-time">Loading…</div>
 
-        <!-- Current Conditions -->
-        <div class="glass-card current-card fade-in-up">
-          <div class="card-label">🌡 Current Conditions</div>
-          <div class="current-weather-icon">
+        <div class="msn-hero-center">
+          <div class="msn-hero-icon">
             {% if icon_class == "sun" %}☀️
             {% elif icon_class == "moon" %}🌙
             {% elif icon_class == "partly-cloudy" %}⛅
@@ -102,320 +72,377 @@
             {% elif icon_class == "thunder" %}⛈
             {% elif icon_class == "snow" %}❄️
             {% elif icon_class == "fog" %}🌫
-            {% else %}🌤
-            {% endif %}
+            {% else %}🌤{% endif %}
           </div>
-          <div class="current-temp">{{ temp }}<span class="current-unit">°C</span></div>
-          <div class="current-desc">{{ description }}</div>
-          <div class="current-feels">
-            RealFeel® <strong>{{ feels_like }}°C</strong>
-          </div>
-          <div class="current-minmax">
-            <span class="temp-high">▲ {{ temp_max }}°C</span>
-            <span class="temp-low">▼ {{ temp_min }}°C</span>
-          </div>
-
-          <div class="stats-grid">
-            <div class="stat-item">
-              <div class="stat-icon">💧</div>
-              <div class="stat-val">{{ humidity }}%</div>
-              <div class="stat-lbl">Humidity</div>
-            </div>
-            <div class="stat-item">
-              <div class="stat-icon">🔵</div>
-              <div class="stat-val">{{ pressure }} hPa</div>
-              <div class="stat-lbl">Pressure</div>
-            </div>
-            <div class="stat-item">
-              <div class="stat-icon">👁</div>
-              <div class="stat-val">{{ visibility }} km</div>
-              <div class="stat-lbl">Visibility</div>
-            </div>
-            <div class="stat-item">
-              <div class="stat-icon">💨</div>
-              <div class="stat-val">{{ wind_speed }} km/h</div>
-              <div class="stat-lbl">Wind Speed</div>
+          <div class="msn-hero-temp-block">
+            <div class="msn-big-temp">{{ temp }}<span class="msn-unit">°C</span></div>
+            <div class="msn-desc">{{ description }}</div>
+            <div class="msn-feels">Feels like <strong>{{ feels_like }}°C</strong></div>
+            <div class="msn-hilo">
+              <span class="hilo-high">▲ {{ today_high }}°</span>
+              <span class="hilo-sep">/</span>
+              <span class="hilo-low">▼ {{ today_low }}°</span>
             </div>
           </div>
         </div>
+      </div>
 
-        <!-- Wind Card -->
-        <div class="glass-card fade-in-up delay-1">
-          <div class="card-label">💨 Wind</div>
-          <div class="wind-compass">
-            <div class="compass-labels">
-              <span class="n">N</span>
-              <span class="s">S</span>
-              <span class="e">E</span>
-              <span class="w">W</span>
-            </div>
-            <div class="compass-arrow" id="compass-arrow" style="transform: translateX(-50%) rotate({{ wind_deg }}deg);"></div>
-            <div class="compass-center"></div>
-          </div>
-          <div class="wind-info-row">
-            <div class="wind-info-item">
-              <div class="val">{{ wind_speed }}</div>
-              <div class="lbl">Speed (km/h)</div>
-            </div>
-            <div class="wind-info-item">
-              <div class="val">{{ wind_dir }}</div>
-              <div class="lbl">Direction</div>
-            </div>
-            <div class="wind-info-item">
-              <div class="val">{{ wind_deg }}°</div>
-              <div class="lbl">Bearing</div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Sunrise / Sunset -->
-        <div class="glass-card fade-in-up delay-2">
-          <div class="card-label">🌅 Sun & Moon</div>
-          <div class="sun-times">
+      <!-- Right: Stats pills -->
+      <div class="msn-hero-right">
+        <div class="msn-stats-grid">
+          <div class="msn-stat-pill">
+            <span class="msn-stat-icon">💧</span>
             <div>
-              <div class="rise">☀ Sunrise</div>
-              <div id="sunrise-time" style="font-size:1.2rem;font-weight:700;">--:--</div>
-            </div>
-            <div style="text-align:right;">
-              <div class="set">🌙 Sunset</div>
-              <div id="sunset-time" style="font-size:1.2rem;font-weight:700;">--:--</div>
+              <div class="msn-stat-val">{{ humidity }}%</div>
+              <div class="msn-stat-lbl">Humidity</div>
             </div>
           </div>
-          <div id="sun-progress-bar" style="margin:1rem 0;height:6px;border-radius:999px;background:rgba(255,255,255,0.1);overflow:hidden;">
-            <div id="sun-progress" style="height:100%;background:linear-gradient(to right,#fbbf24,#f97316);border-radius:999px;width:0%;transition:width 1s ease;"></div>
-          </div>
-          <div style="text-align:center;font-size:0.8rem;color:var(--text-muted);">
-            Day Length: <span id="day-length" style="color:var(--text);font-weight:600;">--h --m</span>
-          </div>
-        </div>
-
-        <!-- AQI Card -->
-        <div class="glass-card fade-in-up delay-3">
-          <div class="card-label">🌿 Air Quality Index</div>
-          <div class="aqi-value-row">
+          <div class="msn-stat-pill">
+            <span class="msn-stat-icon">💨</span>
             <div>
-              <div class="aqi-number" style="color: {{ aqi_color }};">{{ aqi_index }}</div>
-              <div class="aqi-text" style="color: {{ aqi_color }};">{{ aqi_text }}</div>
+              <div class="msn-stat-val">{{ wind_speed }} <small>km/h</small></div>
+              <div class="msn-stat-lbl">Wind {{ wind_dir }}</div>
             </div>
-            {% if aqi_components %}
-            <div style="text-align:right;font-size:0.78rem;color:var(--text-muted);line-height:1.8;">
-              <div>PM2.5: <strong style="color:var(--text)">{{ "%.1f"|format(aqi_components.get('pm2_5', 0)) }}</strong> μg/m³</div>
-              <div>PM10: <strong style="color:var(--text)">{{ "%.1f"|format(aqi_components.get('pm10', 0)) }}</strong> μg/m³</div>
-              <div>O₃: <strong style="color:var(--text)">{{ "%.1f"|format(aqi_components.get('o3', 0)) }}</strong> μg/m³</div>
+          </div>
+          <div class="msn-stat-pill">
+            <span class="msn-stat-icon">🔵</span>
+            <div>
+              <div class="msn-stat-val">{{ pressure }} <small>hPa</small></div>
+              <div class="msn-stat-lbl">Pressure</div>
             </div>
-            {% endif %}
           </div>
-          <div class="aqi-bar-track">
-            <div class="aqi-bar-thumb" style="left: {{ ((aqi_index - 1) / 4 * 100)|int }}%;"></div>
-          </div>
-          <div style="display:flex;justify-content:space-between;font-size:0.65rem;color:var(--text-dim);">
-            <span>Good</span><span>Fair</span><span>Moderate</span><span>Poor</span><span>Very Poor</span>
+          <div class="msn-stat-pill">
+            <span class="msn-stat-icon">👁</span>
+            <div>
+              <div class="msn-stat-val">{{ visibility }} <small>km</small></div>
+              <div class="msn-stat-lbl">Visibility</div>
+            </div>
           </div>
         </div>
+        <div class="msn-updated">Updated {{ last_updated }}</div>
+      </div>
+    </section>
 
-      </div><!-- /dashboard-left -->
+    <!-- ══════════════════════════════════════════════════════════════════
+         SECTION 2: HOURLY FORECAST STRIP
+         ══════════════════════════════════════════════════════════════════ -->
+    <section class="msn-section fade-in-up delay-1" id="hourly-section">
+      <div class="msn-section-title">⏰ Hourly Forecast</div>
+      <div class="msn-hourly-strip">
+        {% for h in hourly %}
+        <div class="msn-hourly-card {% if loop.first %}msn-hourly-active{% endif %}" id="hcard-{{ loop.index }}">
+          <div class="msn-h-time">{{ h.time }}</div>
+          <div class="msn-h-icon">
+            {% if h.icon_class == "sun" %}☀️
+            {% elif h.icon_class == "moon" %}🌙
+            {% elif h.icon_class == "partly-cloudy" %}⛅
+            {% elif h.icon_class == "partly-cloudy-night" %}🌤
+            {% elif h.icon_class == "cloudy" %}🌥
+            {% elif h.icon_class == "overcast" %}☁️
+            {% elif h.icon_class == "rain" %}🌧
+            {% elif h.icon_class == "rain-sun" %}🌦
+            {% elif h.icon_class == "thunder" %}⛈
+            {% elif h.icon_class == "snow" %}❄️
+            {% elif h.icon_class == "fog" %}🌫
+            {% else %}🌤{% endif %}
+          </div>
+          <div class="msn-h-temp">{{ h.temp }}°</div>
+          {% if h.precip > 0 %}
+          <div class="msn-h-pop">💧 {{ h.precip }}%</div>
+          {% else %}
+          <div class="msn-h-pop" style="visibility:hidden;">-</div>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+    </section>
 
-      <!-- RIGHT COLUMN -->
-      <div class="dashboard-right">
+    <!-- ══════════════════════════════════════════════════════════════════
+         SECTION 3: 5-DAY FORECAST (Expandable)
+         ══════════════════════════════════════════════════════════════════ -->
+    <section class="msn-section fade-in-up delay-2" id="forecast-section">
+      <div class="msn-section-title">📅 5-Day Forecast</div>
+      <div class="msn-forecast-list">
 
-        <!-- Hourly Forecast -->
-        <div class="glass-card fade-in-up">
-          <div class="card-label">⏰ Hourly Forecast</div>
-          <div class="hourly-scroll">
-            {% for h in hourly %}
-            <div class="hourly-item {% if loop.first %}active{% endif %}">
-              <div class="hourly-time">{{ h.time }}</div>
-              <div class="hourly-icon">
-                {% if h.icon_class == "sun" %}☀️
-                {% elif h.icon_class == "moon" %}🌙
-                {% elif h.icon_class == "partly-cloudy" %}⛅
-                {% elif h.icon_class == "partly-cloudy-night" %}🌤
-                {% elif h.icon_class == "cloudy" %}🌥
-                {% elif h.icon_class == "overcast" %}☁️
-                {% elif h.icon_class == "rain" %}🌧
-                {% elif h.icon_class == "rain-sun" %}🌦
-                {% elif h.icon_class == "thunder" %}⛈
-                {% elif h.icon_class == "snow" %}❄️
-                {% elif h.icon_class == "fog" %}🌫
-                {% else %}🌤
-                {% endif %}
-              </div>
-              <div class="hourly-temp">{{ h.temp }}°</div>
-              {% if h.precip > 0 %}
-              <div class="hourly-pop">💧{{ h.precip }}%</div>
+        {% for d in daily %}
+        <div class="msn-day-row" id="day-row-{{ loop.index }}">
+          <!-- Day summary header (clickable) -->
+          <div class="msn-day-header" onclick="toggleDay({{ loop.index }})">
+            <div class="msn-day-name">
+              {% if d.is_today %}Today
+              {% elif loop.index == 2 %}Tomorrow
+              {% else %}
+                {% set months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"] %}
+                {% set parts = d.date.split('-') %}
+                {% set m = parts[1]|int - 1 %}
+                {{ months[m] }} {{ parts[2] }}
               {% endif %}
             </div>
-            {% endfor %}
+            <div class="msn-day-icon">
+              {% if d.icon_class == "sun" %}☀️
+              {% elif d.icon_class == "moon" %}🌙
+              {% elif d.icon_class == "partly-cloudy" %}⛅
+              {% elif d.icon_class == "partly-cloudy-night" %}🌤
+              {% elif d.icon_class == "cloudy" %}🌥
+              {% elif d.icon_class == "overcast" %}☁️
+              {% elif d.icon_class == "rain" %}🌧
+              {% elif d.icon_class == "rain-sun" %}🌦
+              {% elif d.icon_class == "thunder" %}⛈
+              {% elif d.icon_class == "snow" %}❄️
+              {% elif d.icon_class == "fog" %}🌫
+              {% else %}🌤{% endif %}
+            </div>
+            <div class="msn-day-desc">{{ d.desc }}{% if d.precip > 10 %} · 💧{{ d.precip }}%{% endif %}</div>
+            <div class="msn-day-temps">
+              <span class="msn-day-high">{{ d.high }}°</span>
+              <span class="msn-day-sep">/</span>
+              <span class="msn-day-low">{{ d.low }}°</span>
+            </div>
+            <div class="msn-day-chevron" id="chev-{{ loop.index }}">›</div>
+          </div>
+
+          <!-- Expanded hourly breakdown (hidden by default, today shown open) -->
+          <div class="msn-day-detail {% if d.is_today %}msn-day-open{% endif %}" id="day-detail-{{ loop.index }}">
+            <div class="msn-day-hourly-strip">
+              {% for h in d.hourly %}
+              <div class="msn-day-hourly-card">
+                <div class="msn-h-time">{{ h.time }}</div>
+                <div class="msn-h-icon">
+                  {% if h.icon_class == "sun" %}☀️
+                  {% elif h.icon_class == "moon" %}🌙
+                  {% elif h.icon_class == "partly-cloudy" %}⛅
+                  {% elif h.icon_class == "partly-cloudy-night" %}🌤
+                  {% elif h.icon_class == "cloudy" %}🌥
+                  {% elif h.icon_class == "overcast" %}☁️
+                  {% elif h.icon_class == "rain" %}🌧
+                  {% elif h.icon_class == "rain-sun" %}🌦
+                  {% elif h.icon_class == "thunder" %}⛈
+                  {% elif h.icon_class == "snow" %}❄️
+                  {% elif h.icon_class == "fog" %}🌫
+                  {% else %}🌤{% endif %}
+                </div>
+                <div class="msn-h-temp">{{ h.temp }}°</div>
+                {% if h.precip > 0 %}
+                <div class="msn-h-pop">💧{{ h.precip }}%</div>
+                {% else %}
+                <div class="msn-h-pop" style="visibility:hidden;">-</div>
+                {% endif %}
+              </div>
+              {% endfor %}
+            </div>
           </div>
         </div>
+        {% endfor %}
 
-        <!-- 7-Day Forecast -->
-        <div class="glass-card fade-in-up delay-1">
-          <div class="card-label">📅 7-Day Forecast</div>
-          <div class="daily-list">
-            {% for d in daily %}
-            <div class="daily-item">
-              <div class="daily-day">
-                {% set days = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"] %}
-                {% set months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"] %}
-                {% if loop.first %}Today
-                {% elif loop.index == 2 %}Tomorrow
-                {% else %}
-                  {% set parts = d.date.split('-') %}
-                  {% set m = parts[1]|int - 1 %}
-                  {{ months[m] }} {{ parts[2] }}
-                {% endif %}
-              </div>
-              <div class="daily-icon">
-                {% if d.icon_class == "sun" %}☀️
-                {% elif d.icon_class == "moon" %}🌙
-                {% elif d.icon_class == "partly-cloudy" %}⛅
-                {% elif d.icon_class == "partly-cloudy-night" %}🌤
-                {% elif d.icon_class == "cloudy" %}🌥
-                {% elif d.icon_class == "overcast" %}☁️
-                {% elif d.icon_class == "rain" %}🌧
-                {% elif d.icon_class == "rain-sun" %}🌦
-                {% elif d.icon_class == "thunder" %}⛈
-                {% elif d.icon_class == "snow" %}❄️
-                {% elif d.icon_class == "fog" %}🌫
-                {% else %}🌤
-                {% endif %}
-              </div>
-              <div class="daily-desc">{{ d.desc }}{% if d.precip > 10 %} · 💧{{ d.precip }}%{% endif %}</div>
+      </div>
+    </section>
+
+    <!-- ══════════════════════════════════════════════════════════════════
+         SECTION 4 + 5: AIR QUALITY  &  SUN & MOON  (side by side)
+         ══════════════════════════════════════════════════════════════════ -->
+    <div class="msn-two-col fade-in-up delay-3">
+
+      <!-- Air Quality Card -->
+      <section class="msn-card" id="aqi-section">
+        <div class="msn-section-title">🌿 Air Quality</div>
+        <div class="msn-aqi-hero">
+          <div class="msn-aqi-badge" style="background: {{ aqi_color }}22; border-color: {{ aqi_color }}55; color: {{ aqi_color }};">
+            <span class="msn-aqi-num">{{ aqi_index }}</span>
+            <span class="msn-aqi-lbl">{{ aqi_text }}</span>
+          </div>
+          <div class="msn-aqi-scale">
+            <div class="msn-aqi-bar">
+              <div class="msn-aqi-thumb" style="left: {{ ((aqi_index - 1) / 4 * 100)|int }}%;"></div>
+            </div>
+            <div class="msn-aqi-scale-labels">
+              <span>Good</span><span>Fair</span><span>Moderate</span><span>Poor</span><span>V.Poor</span>
+            </div>
+          </div>
+        </div>
+        {% if aqi_components %}
+        <div class="msn-pollutants">
+          <div class="msn-pollutant-item">
+            <span class="msn-poll-name">PM<sub>2.5</sub></span>
+            <span class="msn-poll-val">{{ "%.1f"|format(aqi_components.get('pm2_5', 0)) }} μg/m³</span>
+          </div>
+          <div class="msn-pollutant-item">
+            <span class="msn-poll-name">PM<sub>10</sub></span>
+            <span class="msn-poll-val">{{ "%.1f"|format(aqi_components.get('pm10', 0)) }} μg/m³</span>
+          </div>
+          <div class="msn-pollutant-item">
+            <span class="msn-poll-name">O<sub>3</sub></span>
+            <span class="msn-poll-val">{{ "%.1f"|format(aqi_components.get('o3', 0)) }} μg/m³</span>
+          </div>
+        </div>
+        {% endif %}
+      </section>
+
+      <!-- Sun & Moon Card -->
+      <section class="msn-card" id="sunmoon-section">
+        <div class="msn-section-title">🌅 Sun &amp; Moon</div>
+
+        <!-- Sun arc progress -->
+        <div class="msn-sun-arc-wrap">
+          <svg viewBox="0 0 200 110" class="msn-sun-svg" aria-hidden="true">
+            <!-- Dashed background arc (semicircle) -->
+            <path d="M 10 100 A 90 90 0 0 1 190 100"
+                  fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="2" stroke-dasharray="5 4"/>
+            <!-- Active progress arc, animated via JS -->
+            <path id="sun-arc-active" d="M 10 100 A 90 90 0 0 1 190 100"
+                  fill="none" stroke="#fbbf24" stroke-width="2.5"
+                  stroke-dasharray="0 283" stroke-linecap="round"/>
+            <!-- Sun ball marker -->
+            <circle id="sun-ball" cx="10" cy="100" r="7"
+                    fill="#fbbf24" filter="drop-shadow(0 0 6px rgba(251,191,36,0.8))"/>
+          </svg>
+          <div class="msn-sun-times">
+            <div class="msn-sun-item">
+              <span class="msn-sun-icon">🌅</span>
               <div>
-                <span class="daily-high">{{ d.high }}°</span>
-                &nbsp;
-                <span class="daily-low">{{ d.low }}°</span>
+                <div class="msn-sun-time" id="sunrise-time">--:--</div>
+                <div class="msn-sun-label">Sunrise</div>
               </div>
             </div>
-            {% endfor %}
+            <div class="msn-sun-item" style="text-align:right;">
+              <span class="msn-sun-icon">🌇</span>
+              <div>
+                <div class="msn-sun-time" id="sunset-time">--:--</div>
+                <div class="msn-sun-label">Sunset</div>
+              </div>
+            </div>
+          </div>
+          <div class="msn-day-length">Day Length: <span id="day-length">--h --m</span></div>
+        </div>
+
+        <!-- Moon phase -->
+        <div class="msn-moon-row">
+          <div class="msn-moon-icon">{{ moon.icon }}</div>
+          <div class="msn-moon-info">
+            <div class="msn-moon-phase">{{ moon.name }}</div>
+            <div class="msn-moon-illum">{{ moon.illumination }}% illuminated</div>
           </div>
         </div>
+      </section>
+    </div>
 
-        <!-- Interactive Map -->
-        <div class="glass-card fade-in-up delay-2" style="padding:1rem;">
-          <div class="card-label" style="padding:0.25rem 0.5rem;">🗺 Live Weather Radar</div>
-          <div id="weather-map"></div>
-        </div>
+    <!-- ══════════════════════════════════════════════════════════════════
+         ML PREDICTOR BANNER
+         ══════════════════════════════════════════════════════════════════ -->
+    <div class="ml-banner fade-in-up delay-4" style="margin-bottom:2rem;">
+      <div class="ml-banner-text">
+        <h3>🤖 AI Rain Predictor</h3>
+        <p>CatBoost ML model — 85%+ accuracy predicting if it will rain tomorrow.</p>
+      </div>
+      <a href="/predict-form" class="btn-ml">Try It →</a>
+    </div>
 
-        <!-- ML Predictor Banner -->
-        <div class="ml-banner fade-in-up delay-3">
-          <div class="ml-banner-text">
-            <h3>🤖 AI Rain Predictor</h3>
-            <p>Use our CatBoost ML model to predict if it will rain tomorrow — 85%+ accuracy.</p>
-          </div>
-          <a href="/predict-form" class="btn-ml">Try It →</a>
-        </div>
-
-      </div><!-- /dashboard-right -->
-    </div><!-- /dashboard-grid -->
-  </div><!-- /dashboard-body -->
+  </div><!-- /msn-layout -->
   {% endif %}
 
-  <!-- ── Footer ─────────────────────────────────────────────────────────── -->
   <footer class="footer">
-    <p>© 2025 AccuWeather Clone &nbsp;·&nbsp; Data by <a href="https://openweathermap.org" target="_blank">OpenWeatherMap</a> &nbsp;·&nbsp; <a href="/">Home</a></p>
+    <p>© 2026 GOOD WEATHER &nbsp;·&nbsp; Data by <a href="https://openweathermap.org" target="_blank">OpenWeatherMap</a> &nbsp;·&nbsp; <a href="/">Home</a></p>
   </footer>
 
-  <!-- Scripts -->
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- ── Scripts ─────────────────────────────────────────────────────── -->
   <script src="/static/js/app.js"></script>
   <script>
-    // Pass Python variables to JS
-    const WEATHER_DATA = {
-      lat:       {{ lat | default(51.5) }},
-      lon:       {{ lon | default(-0.1) }},
-      sunrise:   {{ sunrise_ts | default(0) }},
-      sunset:    {{ sunset_ts | default(0) }},
-      timezone:  {{ timezone | default(0) }},
-      wind_deg:  {{ wind_deg | default(0) }},
-      api_key:   "{{ api_key | default('') }}"
+    // ── Pass server data to JS (API key never exposed) ─────────────────
+    const WD = {
+      lat:      {{ lat | default(51.5) }},
+      lon:      {{ lon | default(-0.1) }},
+      sunrise:  {{ sunrise_ts | default(0) }},
+      sunset:   {{ sunset_ts | default(0) }},
+      timezone: {{ timezone | default(0) }},
+      wind_deg: {{ wind_deg | default(0) }}
     };
-  </script>
-  <script>
-    // ── Local Time ───────────────────────────────────────────────────────
+
+    // ── Local time ticker ──────────────────────────────────────────────
     function updateLocalTime() {
-      const offset = WEATHER_DATA.timezone;
+      const offset = WD.timezone;
       const utc = Date.now() + (new Date().getTimezoneOffset() * 60000);
       const local = new Date(utc + offset * 1000);
-      const opts = { weekday:'long', hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:true };
+      const opts = { weekday: 'long', hour: '2-digit', minute: '2-digit', hour12: true };
       const el = document.getElementById('local-time');
-      if (el) el.textContent = 'Local: ' + local.toLocaleString('en-US', opts);
+      if (el) el.textContent = local.toLocaleString('en-US', opts);
     }
     updateLocalTime();
     setInterval(updateLocalTime, 1000);
 
-    // ── Sun times ────────────────────────────────────────────────────────
-    function fmtTime(ts, offset) {
-      const d = new Date((ts + offset) * 1000);
-      return d.toUTCString().slice(17, 22);
-    }
-    const srEl = document.getElementById('sunrise-time');
-    const ssEl = document.getElementById('sunset-time');
-    const dlEl = document.getElementById('day-length');
-    if (srEl && WEATHER_DATA.sunrise) {
-      srEl.textContent = fmtTime(WEATHER_DATA.sunrise, WEATHER_DATA.timezone);
-      ssEl.textContent = fmtTime(WEATHER_DATA.sunset,  WEATHER_DATA.timezone);
-      const dayLen = WEATHER_DATA.sunset - WEATHER_DATA.sunrise;
-      const h = Math.floor(dayLen / 3600);
-      const m = Math.floor((dayLen % 3600) / 60);
-      dlEl.textContent = `${h}h ${m}m`;
-
-      // Sun progress
-      const now = Math.floor(Date.now() / 1000);
-      const pct = Math.min(100, Math.max(0,
-        ((now - WEATHER_DATA.sunrise) / (WEATHER_DATA.sunset - WEATHER_DATA.sunrise)) * 100
-      ));
-      const prog = document.getElementById('sun-progress');
-      if (prog) setTimeout(() => prog.style.width = pct + '%', 300);
-    }
-
-    // ── Compass ──────────────────────────────────────────────────────────
-    const arrow = document.getElementById('compass-arrow');
-    if (arrow) {
-      setTimeout(() => {
-        arrow.style.transform = `translateX(-50%) rotate(${WEATHER_DATA.wind_deg}deg)`;
-      }, 500);
-    }
-
-    // ── Leaflet Map ──────────────────────────────────────────────────────
-    const mapEl = document.getElementById('weather-map');
-    if (mapEl && typeof L !== 'undefined') {
-      const map = L.map('weather-map', { zoomControl: true, scrollWheelZoom: false })
-        .setView([WEATHER_DATA.lat, WEATHER_DATA.lon], 8);
-
-      // Dark base tile
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-        attribution: '©OpenStreetMap ©CartoDB',
-        maxZoom: 19
-      }).addTo(map);
-
-      // OWM Precipitation layer
-      if (WEATHER_DATA.api_key) {
-        L.tileLayer(
-          `https://tile.openweathermap.org/map/precipitation_new/{z}/{x}/{y}.png?appid=${WEATHER_DATA.api_key}`,
-          { opacity: 0.6, maxZoom: 19 }
-        ).addTo(map);
+    // ── Sun times + SVG arc ────────────────────────────────────────────
+    (function() {
+      function fmtTime(ts, offset) {
+        const d = new Date((ts + offset) * 1000);
+        return d.toUTCString().slice(17, 22);
       }
 
-      // Location marker
-      const icon = L.divIcon({
-        html: `<div style="background:var(--orange,#f47921);width:18px;height:18px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 12px rgba(244,121,33,0.8);"></div>`,
-        iconSize: [18, 18],
-        iconAnchor: [9, 9],
-        className: ''
+      const srEl = document.getElementById('sunrise-time');
+      const ssEl = document.getElementById('sunset-time');
+      const dlEl = document.getElementById('day-length');
+      const arcEl = document.getElementById('sun-arc-active');
+      const ballEl = document.getElementById('sun-ball');
+
+      if (srEl && WD.sunrise) {
+        srEl.textContent = fmtTime(WD.sunrise, WD.timezone);
+        ssEl.textContent = fmtTime(WD.sunset,  WD.timezone);
+
+        const dayLen = WD.sunset - WD.sunrise;
+        const h = Math.floor(dayLen / 3600);
+        const m = Math.floor((dayLen % 3600) / 60);
+        dlEl.textContent = `${h}h ${m}m`;
+
+        // SVG arc animation
+        // Semicircle path length ≈ π * 90 ≈ 282.7
+        const arcLen = Math.PI * 90;
+        const now = Math.floor(Date.now() / 1000);
+        const pct = Math.min(1, Math.max(0,
+          (now - WD.sunrise) / (WD.sunset - WD.sunrise)
+        ));
+
+        setTimeout(() => {
+          // Progress dash
+          const filled = pct * arcLen;
+          arcEl.setAttribute('stroke-dasharray', `${filled} ${arcLen}`);
+
+          // Sun ball position along the arc (semicircle centre 100,100, r=90)
+          const angle = Math.PI * (1 - pct);  // π→0 as pct 0→1
+          const bx = 100 + 90 * Math.cos(angle);
+          const by = 100 - 90 * Math.sin(angle);
+          ballEl.setAttribute('cx', bx.toFixed(1));
+          ballEl.setAttribute('cy', by.toFixed(1));
+        }, 400);
+      }
+    })();
+
+    // ── 5-Day Forecast expand/collapse ────────────────────────────────
+    // Rotate chevron for today on load
+    document.addEventListener('DOMContentLoaded', () => {
+      document.querySelectorAll('.msn-day-open').forEach(el => {
+        const idx = el.id.replace('day-detail-', '');
+        const chev = document.getElementById('chev-' + idx);
+        if (chev) chev.classList.add('msn-chev-open');
       });
-      L.marker([WEATHER_DATA.lat, WEATHER_DATA.lon], { icon })
-        .addTo(map)
-        .bindPopup(`<strong style="color:#f47921">{{ city }}</strong><br>{{ temp }}°C · {{ description }}`)
-        .openPopup();
+    });
+
+    function toggleDay(idx) {
+      const detail = document.getElementById('day-detail-' + idx);
+      const chev   = document.getElementById('chev-' + idx);
+      if (!detail) return;
+      const isOpen = detail.classList.contains('msn-day-open');
+      // Close all
+      document.querySelectorAll('.msn-day-detail').forEach(el => el.classList.remove('msn-day-open'));
+      document.querySelectorAll('.msn-day-chevron').forEach(el => el.classList.remove('msn-chev-open'));
+      // Toggle clicked
+      if (!isOpen) {
+        detail.classList.add('msn-day-open');
+        chev && chev.classList.add('msn-chev-open');
+      }
     }
 
-    // ── Hourly item click ────────────────────────────────────────────────
-    document.querySelectorAll('.hourly-item').forEach(item => {
-      item.addEventListener('click', () => {
-        document.querySelectorAll('.hourly-item').forEach(i => i.classList.remove('active'));
-        item.classList.add('active');
+    // ── Hourly card click ─────────────────────────────────────────────
+    document.querySelectorAll('.msn-hourly-card').forEach(card => {
+      card.addEventListener('click', () => {
+        document.querySelectorAll('.msn-hourly-card').forEach(c => c.classList.remove('msn-hourly-active'));
+        card.classList.add('msn-hourly-active');
       });
     });
   </script>

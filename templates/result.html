@@ -3,217 +3,613 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Prediction Result — Weather Prediction</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <title>AI Rain Prediction Result — GOOD WEATHER</title>
+  <meta name="description" content="Advanced AI rain prediction result with probability gauge, risk level, and smart recommendations." />
+  <link rel="icon" type="image/svg+xml" href="/static/images/favicon.svg" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
     :root {
-      --bg:      #0d1117;
-      --card:    #1c2230;
-      --border:  #30363d;
-      --text:    #e6edf3;
-      --muted:   #8b949e;
-      --radius:  16px;
+      --bg:         #080f1a;
+      --surface:    #0f1c2e;
+      --card:       rgba(255,255,255,0.05);
+      --border:     rgba(255,255,255,0.1);
+      --text:       #f0f4f8;
+      --muted:      rgba(240,244,248,0.55);
+      --dim:        rgba(240,244,248,0.3);
+      --orange:     #f59e0b;
+      --sky:        #06b6d4;
+      --radius:     20px;
+      --transition: 0.3s cubic-bezier(0.4,0,0.2,1);
     }
-
     body {
       font-family: 'Inter', sans-serif;
       background: var(--bg);
       color: var(--text);
       min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: 2rem 1rem;
+      background-image:
+        radial-gradient(ellipse 900px 600px at 80% -10%, rgba(245,158,11,0.08) 0%, transparent 60%),
+        radial-gradient(ellipse 600px 400px at 10% 80%, rgba(6,182,212,0.06) 0%, transparent 60%);
     }
 
-    /* ── Result card ───────────────────────────────────────────────────────── */
-    .result-card {
-      max-width: 520px;
-      width: 100%;
+    /* ── TOP NAV ─────────────────────────────────────────────────────────── */
+    .topnav {
+      background: rgba(0,0,0,0.5);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 2rem;
+      height: 58px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky; top: 0; z-index: 99;
+    }
+    .topnav-brand { font-size: 1.1rem; font-weight: 800; color: #fff; text-decoration: none; }
+    .topnav-brand span { color: var(--orange); }
+    .topnav-links { display: flex; gap: 1.5rem; }
+    .topnav-links a { color: var(--muted); text-decoration: none; font-size: 0.88rem; transition: color var(--transition); }
+    .topnav-links a:hover { color: #fff; }
+
+    /* ── PAGE LAYOUT ─────────────────────────────────────────────────────── */
+    .page { max-width: 900px; margin: 0 auto; padding: 2.5rem 1.5rem 4rem; display: flex; flex-direction: column; gap: 1.5rem; }
+
+    /* ── CITY BADGE ──────────────────────────────────────────────────────── */
+    .city-badge {
+      display: inline-flex; align-items: center; gap: 0.6rem;
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 999px; padding: 0.5rem 1.2rem;
+      font-size: 0.88rem; color: var(--text); font-weight: 600;
+      animation: fadeIn 0.4s ease both;
+    }
+
+    /* ── HERO CARD ───────────────────────────────────────────────────────── */
+    .hero-card {
+      background: var(--card);
+      backdrop-filter: blur(20px);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 2.5rem 2rem;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 2rem;
+      align-items: center;
+      position: relative;
+      overflow: hidden;
+      animation: slideUp 0.5s cubic-bezier(0.16,1,0.3,1) both;
+    }
+    .hero-card::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: {% if prediction == 'Yes' %}
+        linear-gradient(135deg, rgba(96,165,250,0.06) 0%, transparent 50%)
+      {% else %}
+        linear-gradient(135deg, rgba(245,158,11,0.08) 0%, transparent 50%)
+      {% endif %};
+      pointer-events: none;
+    }
+
+    .hero-left { display: flex; flex-direction: column; gap: 0.75rem; }
+    .result-eyebrow {
+      font-size: 0.7rem; font-weight: 700; letter-spacing: 0.14em;
+      text-transform: uppercase; color: var(--muted);
+    }
+    .result-headline {
+      font-size: clamp(2rem, 5vw, 3rem);
+      font-weight: 900; line-height: 1.1;
+    }
+    .result-headline.rain {
+      background: linear-gradient(135deg, #60a5fa 0%, #93c5fd 60%, #bfdbfe 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+    .result-headline.no-rain {
+      background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 60%, #fde68a 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+    .result-sub { font-size: 0.98rem; color: var(--muted); line-height: 1.55; }
+
+    /* Risk badge */
+    .risk-badge {
+      display: inline-flex; align-items: center; gap: 0.5rem;
+      padding: 0.45rem 1.1rem;
+      border-radius: 999px;
+      font-size: 0.8rem; font-weight: 700;
+      border: 1px solid {{ risk_border }};
+      background: {{ risk_bg }};
+      color: {{ risk_color }};
+    }
+
+    /* ── PROBABILITY GAUGE ───────────────────────────────────────────────── */
+    .gauge-wrap {
+      display: flex; flex-direction: column; align-items: center; gap: 0.5rem;
+      flex-shrink: 0;
+    }
+    .gauge-svg-wrap { position: relative; width: 160px; height: 90px; overflow: visible; }
+    .gauge-svg { width: 160px; height: 90px; overflow: visible; }
+    .gauge-track { fill: none; stroke: rgba(255,255,255,0.08); stroke-width: 14; stroke-linecap: round; }
+    .gauge-fill {
+      fill: none;
+      stroke-width: 14; stroke-linecap: round;
+      stroke: {% if probability >= 75 %}#ef4444{% elif probability >= 50 %}#f97316{% elif probability >= 25 %}#f59e0b{% else %}#22c55e{% endif %};
+      stroke-dasharray: 251;
+      stroke-dashoffset: {{ 251 - (251 * probability / 100) | round(1) }};
+      transform-origin: center;
+      transform: rotate(-180deg);
+      filter: drop-shadow(0 0 8px {% if probability >= 75 %}rgba(239,68,68,0.6){% elif probability >= 50 %}rgba(249,115,22,0.6){% elif probability >= 25 %}rgba(245,158,11,0.6){% else %}rgba(34,197,94,0.6){% endif %});
+      transition: stroke-dashoffset 1.5s cubic-bezier(0.4,0,0.2,1);
+    }
+    .gauge-center-text {
+      position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);
+      text-align: center; line-height: 1.2;
+    }
+    .gauge-pct { font-size: 2rem; font-weight: 900; color: var(--text); }
+    .gauge-label { font-size: 0.68rem; color: var(--muted); font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; margin-top: 0.2rem; }
+
+    /* ── CONFIDENCE METER ────────────────────────────────────────────────── */
+    .confidence-wrap { display: flex; flex-direction: column; gap: 0.35rem; }
+    .confidence-label-row { display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--muted); }
+    .confidence-label-row strong { color: var(--text); }
+    .confidence-track {
+      height: 8px; border-radius: 999px;
+      background: rgba(255,255,255,0.08);
+      position: relative; overflow: hidden;
+    }
+    .confidence-fill {
+      height: 100%; border-radius: 999px;
+      background: linear-gradient(90deg, #22c55e, #06b6d4);
+      width: {{ confidence }}%;
+      transition: width 1.2s cubic-bezier(0.4,0,0.2,1);
+    }
+
+    /* ── METRICS ROW ─────────────────────────────────────────────────────── */
+    .metrics-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+      animation: fadeIn 0.5s 0.2s ease both;
+    }
+    .metric-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 1.25rem 1rem;
+      text-align: center;
+      transition: border-color var(--transition), transform var(--transition);
+    }
+    .metric-card:hover { border-color: rgba(245,158,11,0.3); transform: translateY(-3px); }
+    .metric-icon { font-size: 1.6rem; margin-bottom: 0.4rem; }
+    .metric-val { font-size: 1.5rem; font-weight: 800; color: var(--text); }
+    .metric-lbl { font-size: 0.72rem; color: var(--muted); margin-top: 0.2rem; font-weight: 500; }
+
+    /* ── SMART RECOMMENDATIONS ───────────────────────────────────────────── */
+    .section-card {
       background: var(--card);
       border: 1px solid var(--border);
       border-radius: var(--radius);
-      padding: 3rem 2.5rem;
-      text-align: center;
-      box-shadow: 0 12px 50px rgba(0,0,0,0.5);
-      animation: slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+      padding: 1.75rem;
+      animation: fadeIn 0.5s 0.3s ease both;
     }
-    @keyframes slideUp {
-      from { opacity: 0; transform: translateY(30px); }
-      to   { opacity: 1; transform: translateY(0); }
-    }
-
-    /* ── Icon ──────────────────────────────────────────────────────────────── */
-    .result-icon {
-      font-size: 5rem;
-      line-height: 1;
+    .section-title {
+      font-size: 0.7rem; font-weight: 700; letter-spacing: 0.13em;
+      text-transform: uppercase; color: var(--muted);
       margin-bottom: 1.25rem;
-      animation: pulse 2s ease-in-out infinite;
+      display: flex; align-items: center; gap: 0.5rem;
     }
-    @keyframes pulse {
-      0%, 100% { transform: scale(1); }
-      50%       { transform: scale(1.08); }
-    }
-
-    /* ── Label ─────────────────────────────────────────────────────────────── */
-    .result-label {
-      font-size: 0.75rem;
-      font-weight: 600;
-      letter-spacing: 0.14em;
-      text-transform: uppercase;
-      color: var(--muted);
-      margin-bottom: 0.6rem;
-    }
-
-    /* ── Main prediction text ──────────────────────────────────────────────── */
-    .result-text {
-      font-size: clamp(2rem, 6vw, 2.8rem);
-      font-weight: 800;
-      line-height: 1.15;
-      margin-bottom: 1rem;
-    }
-    .result-text.rain {
-      background: linear-gradient(135deg, #58a6ff 0%, #79c0ff 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
-    .result-text.no-rain {
-      background: linear-gradient(135deg, #f0b429 0%, #f6e05e 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
-
-    /* ── Sub-text ──────────────────────────────────────────────────────────── */
-    .result-sub {
-      font-size: 0.95rem;
-      color: var(--muted);
-      margin-bottom: 2rem;
-      line-height: 1.5;
-    }
-
-    /* ── Divider ───────────────────────────────────────────────────────────── */
-    .divider {
-      border: none;
-      border-top: 1px solid var(--border);
-      margin: 0 0 2rem;
-    }
-
-    /* ── Stats strip ───────────────────────────────────────────────────────── */
-    .stats {
-      display: flex;
-      justify-content: center;
-      gap: 2rem;
-      margin-bottom: 2rem;
-    }
-    .stat { text-align: center; }
-    .stat-value {
-      font-size: 1.25rem;
-      font-weight: 700;
-      color: var(--text);
-    }
-    .stat-label {
-      font-size: 0.72rem;
-      color: var(--muted);
-      margin-top: 0.2rem;
-    }
-
-    /* ── Back button ───────────────────────────────────────────────────────── */
-    .btn-back {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.45rem;
-      background: transparent;
+    .reco-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 0.85rem; }
+    .reco-item {
+      display: flex; align-items: flex-start; gap: 0.75rem;
+      background: rgba(255,255,255,0.03);
       border: 1px solid var(--border);
-      border-radius: 10px;
-      color: var(--text);
-      font-family: inherit;
-      font-size: 0.9rem;
-      font-weight: 500;
-      padding: 0.7rem 1.8rem;
-      cursor: pointer;
-      text-decoration: none;
-      transition: border-color 0.2s, background 0.2s, transform 0.2s;
+      border-radius: 12px;
+      padding: 0.9rem 1rem;
+      transition: border-color var(--transition);
     }
-    .btn-back:hover {
-      border-color: #58a6ff;
-      background: rgba(88, 166, 255, 0.08);
-      transform: translateY(-2px);
-    }
+    .reco-item:hover { border-color: rgba(245,158,11,0.3); }
+    .reco-emoji { font-size: 1.5rem; flex-shrink: 0; margin-top: 0.1rem; }
+    .reco-text { font-size: 0.82rem; color: var(--text); line-height: 1.45; }
+    .reco-text strong { display: block; font-weight: 700; color: var(--text); margin-bottom: 0.15rem; }
 
-    /* ── Glow ring around card ─────────────────────────────────────────────── */
-    .glow-rain  { box-shadow: 0 0 60px rgba(88, 166, 255, 0.18), 0 12px 50px rgba(0,0,0,0.5); }
-    .glow-sun   { box-shadow: 0 0 60px rgba(240, 180, 41, 0.18), 0 12px 50px rgba(0,0,0,0.5); }
+    /* ── FEATURE IMPORTANCE ──────────────────────────────────────────────── */
+    .importance-list { display: flex; flex-direction: column; gap: 0.75rem; }
+    .imp-item { display: flex; align-items: center; gap: 0.85rem; }
+    .imp-rank {
+      width: 24px; height: 24px; border-radius: 50%;
+      background: rgba(255,255,255,0.06);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.72rem; font-weight: 700; color: var(--orange);
+      flex-shrink: 0;
+    }
+    .imp-label { font-size: 0.85rem; color: var(--text); min-width: 140px; font-weight: 600; }
+    .imp-bar-track { flex: 1; height: 6px; border-radius: 999px; background: rgba(255,255,255,0.06); overflow: hidden; }
+    .imp-bar-fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--orange), #fbbf24); transition: width 1s ease; }
+    .imp-value { font-size: 0.8rem; font-weight: 700; color: var(--orange); min-width: 48px; text-align: right; }
+
+    /* ── CHARTS ──────────────────────────────────────────────────────────── */
+    .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    .chart-box { background: rgba(255,255,255,0.02); border-radius: 14px; padding: 1.25rem; }
+    .chart-title { font-size: 0.75rem; font-weight: 600; color: var(--muted); margin-bottom: 1rem; }
+    .chart-canvas { max-height: 160px; }
+
+    /* ── 18 FEATURES GRID ────────────────────────────────────────────────── */
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(145px, 1fr));
+      gap: 0.75rem;
+    }
+    .feat-card {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--border);
+      border-radius: 12px; padding: 0.9rem 1rem;
+      transition: border-color var(--transition), transform var(--transition);
+    }
+    .feat-card:hover { border-color: rgba(6,182,212,0.3); transform: translateY(-2px); }
+    .feat-icon { font-size: 1.1rem; margin-bottom: 0.3rem; }
+    .feat-val { font-size: 1.05rem; font-weight: 800; color: var(--text); }
+    .feat-lbl { font-size: 0.67rem; color: var(--muted); margin-top: 0.15rem; line-height: 1.3; }
+
+    /* ── NOTE BOX ────────────────────────────────────────────────────────── */
+    .note-box {
+      background: rgba(6,182,212,0.06);
+      border: 1px solid rgba(6,182,212,0.2);
+      border-radius: 12px; padding: 0.9rem 1.1rem;
+      font-size: 0.8rem; color: var(--muted); line-height: 1.5;
+    }
+    .note-box strong { color: var(--sky); }
+
+    /* ── ACTION BUTTONS ──────────────────────────────────────────────────── */
+    .action-row {
+      display: flex; gap: 0.85rem; flex-wrap: wrap;
+      animation: fadeIn 0.5s 0.4s ease both;
+    }
+    .btn-primary {
+      display: inline-flex; align-items: center; gap: 0.5rem;
+      background: linear-gradient(135deg, var(--orange), #d97706);
+      color: #fff; border: none; border-radius: 12px;
+      font-family: inherit; font-size: 0.9rem; font-weight: 700;
+      padding: 0.85rem 1.8rem; cursor: pointer; text-decoration: none;
+      transition: all var(--transition);
+      box-shadow: 0 4px 20px rgba(245,158,11,0.3);
+    }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(245,158,11,0.45); }
+    .btn-secondary {
+      display: inline-flex; align-items: center; gap: 0.5rem;
+      background: transparent; color: var(--text);
+      border: 1px solid var(--border); border-radius: 12px;
+      font-family: inherit; font-size: 0.9rem; font-weight: 600;
+      padding: 0.85rem 1.8rem; cursor: pointer; text-decoration: none;
+      transition: all var(--transition);
+    }
+    .btn-secondary:hover { border-color: var(--sky); background: rgba(6,182,212,0.08); transform: translateY(-2px); }
+    .btn-ghost {
+      display: inline-flex; align-items: center; gap: 0.5rem;
+      background: transparent; color: var(--muted);
+      border: 1px solid var(--border); border-radius: 12px;
+      font-family: inherit; font-size: 0.88rem; font-weight: 500;
+      padding: 0.85rem 1.5rem; cursor: pointer; text-decoration: none;
+      transition: all var(--transition);
+    }
+    .btn-ghost:hover { border-color: rgba(255,255,255,0.25); color: var(--text); }
+
+    /* ── ANIMATIONS ──────────────────────────────────────────────────────── */
+    @keyframes slideUp {
+      from { opacity:0; transform:translateY(30px); }
+      to   { opacity:1; transform:translateY(0); }
+    }
+    @keyframes fadeIn {
+      from { opacity:0; } to { opacity:1; }
+    }
+    @keyframes pulseIcon {
+      0%,100% { transform:scale(1); }
+      50%      { transform:scale(1.1); }
+    }
+    .pulse { animation: pulseIcon 2.5s ease-in-out infinite; }
+
+    /* ── RESPONSIVE ──────────────────────────────────────────────────────── */
+    @media (max-width: 640px) {
+      .hero-card { grid-template-columns: 1fr; }
+      .gauge-wrap { align-items: flex-start; }
+      .metrics-row { grid-template-columns: 1fr 1fr; }
+      .charts-grid { grid-template-columns: 1fr; }
+      .action-row { flex-direction: column; }
+    }
   </style>
 </head>
 <body>
 
-  {% if prediction == "Yes" %}
-  <!-- ── Rain result ──────────────────────────────────────────────────────── -->
-  <div class="result-card glow-rain">
-    <div class="result-icon">🌧</div>
-    <p class="result-label">Tomorrow's Forecast</p>
-    <p class="result-text rain">Yes, It Will Rain!</p>
-    <p class="result-sub">
-      Our model predicts rain tomorrow.<br/>
-      Don't forget your umbrella! ☂️
-    </p>
+  <!-- ── TOP NAV ────────────────────────────────────────────────────────── -->
+  <nav class="topnav">
+    <a href="/" class="topnav-brand">GOOD<span>WEATHER</span></a>
+    <div class="topnav-links">
+      <a href="/">Home</a>
+      <a href="/predict-form">AI Predictor</a>
+    </div>
+  </nav>
 
-    <hr class="divider" />
+  <div class="page">
 
-    <div class="stats">
-      <div class="stat">
-        <div class="stat-value">85%+</div>
-        <div class="stat-label">Model Accuracy</div>
+    <!-- City + Date badge -->
+    <div>
+      <span class="city-badge">
+        📍 {{ city }}{% if country %}, {{ country }}{% endif %}
+        &nbsp;·&nbsp;
+        📅 {{ date }}
+      </span>
+    </div>
+
+    <!-- ── HERO RESULT CARD ───────────────────────────────────────────── -->
+    <div class="hero-card">
+      <div class="hero-left">
+        <p class="result-eyebrow">AI Rain Prediction Result</p>
+
+        {% if prediction == "Yes" %}
+        <h1 class="result-headline rain pulse">Rain Tomorrow!</h1>
+        <p class="result-sub">
+          Our CatBoost ML model predicts <strong>rainfall in {{ city }}</strong> on {{ date }}.<br/>
+          Plan accordingly — an umbrella is strongly recommended.
+        </p>
+        {% else %}
+        <h1 class="result-headline no-rain pulse">No Rain Tomorrow</h1>
+        <p class="result-sub">
+          Our CatBoost ML model predicts <strong>dry weather in {{ city }}</strong> on {{ date }}.<br/>
+          Enjoy the clear skies — great day to be outdoors!
+        </p>
+        {% endif %}
+
+        <div>
+          <span class="risk-badge">
+            ● {{ risk_level }} Rain Risk
+          </span>
+        </div>
+
+        <!-- Confidence meter -->
+        <div class="confidence-wrap" style="margin-top:0.5rem; max-width:360px;">
+          <div class="confidence-label-row">
+            <span>Model Confidence</span>
+            <strong>{{ confidence }}%</strong>
+          </div>
+          <div class="confidence-track">
+            <div class="confidence-fill" id="conf-fill"></div>
+          </div>
+        </div>
       </div>
-      <div class="stat">
-        <div class="stat-value">CatBoost</div>
-        <div class="stat-label">Best Model</div>
-      </div>
-      <div class="stat">
-        <div class="stat-value">145K</div>
-        <div class="stat-label">Training Rows</div>
+
+      <!-- Probability Gauge -->
+      <div class="gauge-wrap">
+        <div class="gauge-svg-wrap">
+          <svg class="gauge-svg" viewBox="0 0 160 90">
+            <path class="gauge-track"
+              d="M 16 84 A 64 64 0 0 1 144 84"
+              stroke-dasharray="none" />
+            <path class="gauge-fill" id="gauge-fill"
+              d="M 16 84 A 64 64 0 0 1 144 84" />
+          </svg>
+          <div class="gauge-center-text">
+            <div class="gauge-pct">{{ probability }}%</div>
+          </div>
+        </div>
+        <div style="text-align:center;">
+          <div class="gauge-label">Rain Probability</div>
+          <div style="font-size:1.8rem; margin-top:0.2rem;">
+            {% if prediction == "Yes" %}🌧{% else %}☀️{% endif %}
+          </div>
+        </div>
       </div>
     </div>
 
-    <a href="/" class="btn-back">← Make Another Prediction</a>
-  </div>
-
-  {% else %}
-  <!-- ── No Rain result ──────────────────────────────────────────────────── -->
-  <div class="result-card glow-sun">
-    <div class="result-icon">☀️</div>
-    <p class="result-label">Tomorrow's Forecast</p>
-    <p class="result-text no-rain">No Rain Tomorrow!</p>
-    <p class="result-sub">
-      Our model predicts a dry day tomorrow.<br/>
-      Enjoy the sunshine! 😎
-    </p>
-
-    <hr class="divider" />
-
-    <div class="stats">
-      <div class="stat">
-        <div class="stat-value">85%+</div>
-        <div class="stat-label">Model Accuracy</div>
+    <!-- ── METRICS ROW ───────────────────────────────────────────────── -->
+    <div class="metrics-row">
+      <div class="metric-card">
+        <div class="metric-icon">🌡️</div>
+        <div class="metric-val">{{ features.min_temp }}° / {{ features.max_temp }}°</div>
+        <div class="metric-lbl">Min / Max Temp (°C)</div>
       </div>
-      <div class="stat">
-        <div class="stat-value">CatBoost</div>
-        <div class="stat-label">Best Model</div>
+      <div class="metric-card">
+        <div class="metric-icon">💧</div>
+        <div class="metric-val">{{ features.humidity_9am }}% / {{ features.humidity_3pm }}%</div>
+        <div class="metric-lbl">Humidity (9am / 3pm)</div>
       </div>
-      <div class="stat">
-        <div class="stat-value">145K</div>
-        <div class="stat-label">Training Rows</div>
+      <div class="metric-card">
+        <div class="metric-icon">💨</div>
+        <div class="metric-val">{{ features.wind_gust_speed }} km/h</div>
+        <div class="metric-lbl">Max Wind Gust</div>
       </div>
     </div>
 
-    <a href="/" class="btn-back">← Make Another Prediction</a>
-  </div>
-  {% endif %}
+    <!-- ── SMART RECOMMENDATIONS ─────────────────────────────────────── -->
+    <div class="section-card">
+      <div class="section-title">💡 Smart Recommendations</div>
+      <div class="reco-grid">
+        {% if prediction == "Yes" %}
+        <div class="reco-item">
+          <div class="reco-emoji">☂️</div>
+          <div class="reco-text"><strong>Carry an Umbrella</strong>Rain is expected — keep one handy at all times.</div>
+        </div>
+        <div class="reco-item">
+          <div class="reco-emoji">👟</div>
+          <div class="reco-text"><strong>Waterproof Footwear</strong>Wet roads likely — wear waterproof shoes or boots.</div>
+        </div>
+        <div class="reco-item">
+          <div class="reco-emoji">🚗</div>
+          <div class="reco-text"><strong>Careful Driving</strong>Slippery roads expected. Drive slowly, increase distance.</div>
+        </div>
+        <div class="reco-item">
+          <div class="reco-emoji">📅</div>
+          <div class="reco-text"><strong>Reschedule Outdoors</strong>Outdoor plans like picnics or events should be moved indoors.</div>
+        </div>
+        {% else %}
+        <div class="reco-item">
+          <div class="reco-emoji">🏃</div>
+          <div class="reco-text"><strong>Great for Outdoors</strong>No rain expected — perfect for jogging, sports, or a walk.</div>
+        </div>
+        <div class="reco-item">
+          <div class="reco-emoji">😎</div>
+          <div class="reco-text"><strong>Wear Sunscreen</strong>Clear skies mean more UV — apply SPF 30+ sunscreen.</div>
+        </div>
+        <div class="reco-item">
+          <div class="reco-emoji">🪟</div>
+          <div class="reco-text"><strong>Ventilate Rooms</strong>Good weather — open windows for fresh air circulation.</div>
+        </div>
+        <div class="reco-item">
+          <div class="reco-emoji">🌿</div>
+          <div class="reco-text"><strong>Water Your Plants</strong>No rain means you should manually water outdoor plants.</div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
 
+    <!-- ── FEATURE IMPORTANCE ─────────────────────────────────────────── -->
+    {% if features %}
+    <div class="section-card">
+      <div class="section-title">📊 Key Influencing Signals</div>
+      <div class="importance-list">
+        <div class="imp-item">
+          <div class="imp-rank">1</div>
+          <div class="imp-label">💧 Humidity at 3pm</div>
+          <div class="imp-bar-track"><div class="imp-bar-fill" style="width:{{ [features.humidity_3pm, 100]|min }}%;"></div></div>
+          <div class="imp-value">{{ features.humidity_3pm }}%</div>
+        </div>
+        <div class="imp-item">
+          <div class="imp-rank">2</div>
+          <div class="imp-label">🌡️ Temp at 3pm</div>
+          <div class="imp-bar-track"><div class="imp-bar-fill" style="width:{{ [(features.temp_3pm / 50 * 100), 100]|min }}%;"></div></div>
+          <div class="imp-value">{{ features.temp_3pm }}°C</div>
+        </div>
+        <div class="imp-item">
+          <div class="imp-rank">3</div>
+          <div class="imp-label">🌬️ Wind Gust</div>
+          <div class="imp-bar-track"><div class="imp-bar-fill" style="width:{{ [(features.wind_gust_speed / 120 * 100), 100]|min }}%;"></div></div>
+          <div class="imp-value">{{ features.wind_gust_speed }} km/h</div>
+        </div>
+        <div class="imp-item">
+          <div class="imp-rank">4</div>
+          <div class="imp-label">🔵 Pressure at 3pm</div>
+          <div class="imp-bar-track"><div class="imp-bar-fill" style="width:{{ [((features.pressure_3pm - 980) / 40 * 100), 100]|min }}%;"></div></div>
+          <div class="imp-value">{{ features.pressure_3pm }} hPa</div>
+        </div>
+        <div class="imp-item">
+          <div class="imp-rank">5</div>
+          <div class="imp-label">🌧️ Rainfall Today</div>
+          <div class="imp-bar-track"><div class="imp-bar-fill" style="width:{{ [features.rainfall * 10, 100]|min }}%;"></div></div>
+          <div class="imp-value">{{ features.rainfall }} mm</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── TREND CHARTS ───────────────────────────────────────────────── -->
+    <div class="section-card">
+      <div class="section-title">📈 Weather Trend Charts</div>
+      <div class="charts-grid">
+        <div class="chart-box">
+          <div class="chart-title">Humidity Trend (9am → 3pm)</div>
+          <canvas class="chart-canvas" id="humidityChart"></canvas>
+        </div>
+        <div class="chart-box">
+          <div class="chart-title">Pressure Trend (9am → 3pm)</div>
+          <canvas class="chart-canvas" id="pressureChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── 18 FEATURE CARDS ───────────────────────────────────────────── -->
+    <div class="section-card">
+      <div class="section-title">⚙️ All Auto-Derived Model Features (18)</div>
+      <div class="features-grid">
+        <div class="feat-card"><div class="feat-icon">🌡️</div><div class="feat-val">{{ features.min_temp }}°C</div><div class="feat-lbl">Min Temp</div></div>
+        <div class="feat-card"><div class="feat-icon">🌡️</div><div class="feat-val">{{ features.max_temp }}°C</div><div class="feat-lbl">Max Temp</div></div>
+        <div class="feat-card"><div class="feat-icon">🌧️</div><div class="feat-val">{{ features.rainfall }} mm</div><div class="feat-lbl">Rainfall</div></div>
+        <div class="feat-card"><div class="feat-icon">💦</div><div class="feat-val">{{ features.evaporation }} mm</div><div class="feat-lbl">Evaporation</div></div>
+        <div class="feat-card"><div class="feat-icon">☀️</div><div class="feat-val">{{ features.sunshine }} hrs</div><div class="feat-lbl">Sunshine (est.)</div></div>
+        <div class="feat-card"><div class="feat-icon">💨</div><div class="feat-val">{{ features.wind_gust_speed }}</div><div class="feat-lbl">Wind Gust (km/h)</div></div>
+        <div class="feat-card"><div class="feat-icon">🌬️</div><div class="feat-val">{{ features.wind_speed_9am }}</div><div class="feat-lbl">Wind Speed 9am</div></div>
+        <div class="feat-card"><div class="feat-icon">🌬️</div><div class="feat-val">{{ features.wind_speed_3pm }}</div><div class="feat-lbl">Wind Speed 3pm</div></div>
+        <div class="feat-card"><div class="feat-icon">💧</div><div class="feat-val">{{ features.humidity_9am }}%</div><div class="feat-lbl">Humidity 9am</div></div>
+        <div class="feat-card"><div class="feat-icon">💧</div><div class="feat-val">{{ features.humidity_3pm }}%</div><div class="feat-lbl">Humidity 3pm</div></div>
+        <div class="feat-card"><div class="feat-icon">🔵</div><div class="feat-val">{{ features.pressure_9am }}</div><div class="feat-lbl">Pressure 9am (hPa)</div></div>
+        <div class="feat-card"><div class="feat-icon">🔵</div><div class="feat-val">{{ features.pressure_3pm }}</div><div class="feat-lbl">Pressure 3pm (hPa)</div></div>
+        <div class="feat-card"><div class="feat-icon">🌡️</div><div class="feat-val">{{ features.temp_9am }}°C</div><div class="feat-lbl">Temp 9am</div></div>
+        <div class="feat-card"><div class="feat-icon">🌡️</div><div class="feat-val">{{ features.temp_3pm }}°C</div><div class="feat-lbl">Temp 3pm</div></div>
+        <div class="feat-card"><div class="feat-icon">{% if features.rain_today %}🌧️{% else %}☀️{% endif %}</div><div class="feat-val">{% if features.rain_today %}Yes{% else %}No{% endif %}</div><div class="feat-lbl">Rain Today</div></div>
+        <div class="feat-card"><div class="feat-icon">📅</div><div class="feat-val">{{ features.day }}/{{ features.month }}</div><div class="feat-lbl">Date (Day/Month)</div></div>
+        <div class="feat-card"><div class="feat-icon">📆</div><div class="feat-val">{{ features.year }}</div><div class="feat-lbl">Year</div></div>
+        <div class="feat-card"><div class="feat-icon">📍</div><div class="feat-val">{{ features.resolved_city }}</div><div class="feat-lbl">Resolved Location</div></div>
+      </div>
+
+      <div class="note-box" style="margin-top:1.25rem;">
+        <strong>Estimation Note:</strong>
+        Sunshine hours are estimated from cloud cover density. Evaporation is calculated using the Hargreaves solar radiation model. Both are not directly available from the OpenWeatherMap free tier.
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- ── ACTION BUTTONS ─────────────────────────────────────────────── -->
+    <div class="action-row">
+      <a href="/predict-form" class="btn-primary">Run Another Prediction</a>
+      <a href="/predict-form?multi=1" class="btn-secondary">5-Day AI Timeline</a>
+      <a href="/weather?city={{ city }}" class="btn-ghost">View Live Weather</a>
+    </div>
+
+  </div><!-- /page -->
+
+  <script>
+    // ── Humidity Chart ────────────────────────────────────────────────────
+    const humCtx = document.getElementById('humidityChart').getContext('2d');
+    new Chart(humCtx, {
+      type: 'line',
+      data: {
+        labels: ['9:00 AM', '3:00 PM'],
+        datasets: [{
+          label: 'Humidity %',
+          data: [{{ features.humidity_9am }}, {{ features.humidity_3pm }}],
+          borderColor: '#60a5fa',
+          backgroundColor: 'rgba(96,165,250,0.12)',
+          borderWidth: 2.5,
+          tension: 0.4,
+          fill: true,
+          pointBackgroundColor: '#60a5fa',
+          pointRadius: 5,
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: 'rgba(240,244,248,0.5)', font: { size: 11 } } },
+          y: {
+            grid: { color: 'rgba(255,255,255,0.05)' },
+            ticks: { color: 'rgba(240,244,248,0.5)', font: { size: 11 } },
+            min: 0, max: 100,
+          }
+        }
+      }
+    });
+
+    // ── Pressure Chart ────────────────────────────────────────────────────
+    const presCtx = document.getElementById('pressureChart').getContext('2d');
+    new Chart(presCtx, {
+      type: 'line',
+      data: {
+        labels: ['9:00 AM', '3:00 PM'],
+        datasets: [{
+          label: 'Pressure hPa',
+          data: [{{ features.pressure_9am }}, {{ features.pressure_3pm }}],
+          borderColor: '#f59e0b',
+          backgroundColor: 'rgba(245,158,11,0.1)',
+          borderWidth: 2.5,
+          tension: 0.4,
+          fill: true,
+          pointBackgroundColor: '#f59e0b',
+          pointRadius: 5,
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: 'rgba(240,244,248,0.5)', font: { size: 11 } } },
+          y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: 'rgba(240,244,248,0.5)', font: { size: 11 } } }
+        }
+      }
+    });
+  </script>
 </body>
 </html>

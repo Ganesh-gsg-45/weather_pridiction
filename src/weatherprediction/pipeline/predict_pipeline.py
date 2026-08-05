@@ -28,14 +28,7 @@ class PredictPipeline:
 
     def predict(self, features: pd.DataFrame) -> list[str]:
         """
-        Parameters
-        ----------
-        features : pd.DataFrame
-            One or more rows with columns matching FEATURE_COLUMNS.
-
-        Returns
-        -------
-        list of "Yes" / "No" strings (one per row)
+        Returns list of 'Yes' / 'No' strings (one per row).
         """
         try:
             logger.info("─── Prediction pipeline started ──────────────────────────")
@@ -45,7 +38,6 @@ class PredictPipeline:
             features_transformed = preprocessor.transform(features)
             preds = model.predict(features_transformed)
 
-            # Map 1 → "Yes", 0 → "No"
             results = ["Yes" if p == 1 else "No" for p in preds]
             logger.info(f"Predictions: {results}")
             logger.info("─── Prediction pipeline complete ─────────────────────────")
@@ -53,6 +45,78 @@ class PredictPipeline:
 
         except Exception as e:
             raise WeatherException(e, sys)
+
+    def predict_advanced(self, features: pd.DataFrame) -> list[dict]:
+        """
+        Returns enriched prediction dicts with:
+          - prediction:   'Yes' / 'No'
+          - probability:  float  0-100  (rain probability %)
+          - confidence:   float  0-100  (distance from 0.5 decision boundary, scaled)
+          - risk_level:   str    'Low' / 'Moderate' / 'High' / 'Very High'
+          - risk_color:   str    CSS hex color
+        """
+        try:
+            logger.info("─── Advanced Prediction pipeline started ─────────────────")
+            preprocessor = load_object(PREPROCESSOR_PATH)
+            model         = load_object(MODEL_PATH)
+
+            features_transformed = preprocessor.transform(features)
+            preds = model.predict(features_transformed)
+
+            # Try to get probability — fallback to hard 0/1 if model doesn't support it
+            try:
+                proba = model.predict_proba(features_transformed)
+                rain_proba = proba[:, 1]  # probability of class 1 (rain)
+            except AttributeError:
+                rain_proba = np.array([1.0 if p == 1 else 0.0 for p in preds])
+
+            results = []
+            for i, p in enumerate(preds):
+                prob_pct = round(float(rain_proba[i]) * 100, 1)
+                label    = "Yes" if p == 1 else "No"
+
+                # Confidence = how far from 0.5 boundary, scaled 0-100
+                confidence = round(abs(float(rain_proba[i]) - 0.5) * 200, 1)
+
+                # Risk level based on rain probability
+                if prob_pct < 25:
+                    risk_level = "Low"
+                    risk_color = "#22c55e"
+                    risk_bg    = "rgba(34,197,94,0.12)"
+                    risk_border= "rgba(34,197,94,0.35)"
+                elif prob_pct < 50:
+                    risk_level = "Moderate"
+                    risk_color = "#f59e0b"
+                    risk_bg    = "rgba(245,158,11,0.12)"
+                    risk_border= "rgba(245,158,11,0.35)"
+                elif prob_pct < 75:
+                    risk_level = "High"
+                    risk_color = "#f97316"
+                    risk_bg    = "rgba(249,115,22,0.12)"
+                    risk_border= "rgba(249,115,22,0.35)"
+                else:
+                    risk_level = "Very High"
+                    risk_color = "#ef4444"
+                    risk_bg    = "rgba(239,68,68,0.12)"
+                    risk_border= "rgba(239,68,68,0.35)"
+
+                results.append({
+                    "prediction":   label,
+                    "probability":  prob_pct,
+                    "confidence":   confidence,
+                    "risk_level":   risk_level,
+                    "risk_color":   risk_color,
+                    "risk_bg":      risk_bg,
+                    "risk_border":  risk_border,
+                })
+
+            logger.info(f"Advanced predictions: {results}")
+            logger.info("─── Advanced Prediction pipeline complete ────────────────")
+            return results
+
+        except Exception as e:
+            raise WeatherException(e, sys)
+
 
 
 class CustomData:

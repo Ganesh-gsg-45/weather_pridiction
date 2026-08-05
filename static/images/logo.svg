@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 50" width="240" height="50">
+  <defs>
+    <linearGradient id="sunGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f59e0b" />
+      <stop offset="100%" stop-color="#fbbf24" />
+    </linearGradient>
+    <linearGradient id="skyGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#06b6d4" />
+      <stop offset="100%" stop-color="#3b82f6" />
+    </linearGradient>
+  </defs>
+  <!-- Sun Icon -->
+  <circle cx="24" cy="20" r="10" fill="url(#sunGrad)"/>
+  <!-- Sun rays -->
+  <path d="M 24 5 L 24 8 M 24 32 L 24 35 M 9 20 L 12 20 M 36 20 L 39 20 M 13.4 9.4 L 15.5 11.5 M 32.5 28.5 L 34.6 30.6 M 13.4 30.6 L 15.5 28.5 M 32.5 11.5 L 34.6 9.4" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round"/>
+  <!-- Cloud Overlay -->
+  <path d="M 18 28 A 7 7 0 0 1 31 25 A 5 5 0 0 1 39 29 A 5 5 0 0 1 37 36 L 18 36 A 5 5 0 0 1 18 28 Z" fill="url(#skyGrad)" opacity="0.9"/>
+  <!-- Text -->
+  <text x="48" y="32" font-family="'Inter', system-ui, -apple-system, sans-serif" font-weight="900" font-size="20" fill="#ffffff" letter-spacing="-0.5px">GOOD <tspan fill="#f59e0b">WEATHER</tspan></text>
+</svg>

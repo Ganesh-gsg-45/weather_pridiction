@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════════════
-   AccuWeather Clone — Global Design System
+   GOOD WEATHER — Global Design System
    ═══════════════════════════════════════════════════════════════════════════ */
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
@@ -8,9 +8,10 @@
 
 /* ── Design Tokens ──────────────────────────────────────────────────────── */
 :root {
-  --orange:      #f47921;
-  --orange-dark: #d4631a;
-  --orange-glow: rgba(244, 121, 33, 0.25);
+  --orange:      #f59e0b;
+  --orange-dark: #d97706;
+  --orange-glow: rgba(245, 158, 11, 0.25);
+  --brand-sky:   #06b6d4;
   --navy:        #0b1a2e;
   --navy-light:  #122040;
   --card-bg:     rgba(255,255,255,0.06);
@@ -869,3 +870,434 @@ body {
   .daily-desc { display: none; }
   .feature-banner { flex-direction: column; text-align: center; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MSN-WEATHER PAGE LAYOUT
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Body override for MSN page */
+.msn-body {
+  background: linear-gradient(160deg, #0b1a2e 0%, #0a1628 60%, #071020 100%);
+  min-height: 100vh;
+}
+
+/* ── Centred single-column layout ──────────────────────────────────────── */
+.msn-layout {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 1rem 1.5rem 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+/* ── Breadcrumb ─────────────────────────────────────────────────────────── */
+.msn-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  padding: 0.25rem 0;
+}
+.msn-breadcrumb-sep { color: var(--text-dim); }
+
+/* ── Section title ──────────────────────────────────────────────────────── */
+.msn-section-title {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 1rem;
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   HERO CARD
+   ════════════════════════════════════════════════════════════════════════════ */
+.msn-hero-card {
+  background: linear-gradient(135deg,
+    rgba(245,158,11,0.12) 0%,
+    rgba(11,26,46,0.7) 50%,
+    rgba(6,182,212,0.06) 100%);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 24px;
+  padding: 2rem 2.5rem;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 2rem;
+  box-shadow: 0 12px 48px rgba(0,0,0,0.4), 0 0 60px rgba(245,158,11,0.06);
+  position: relative;
+  overflow: hidden;
+}
+/* Subtle gradient orb in background */
+.msn-hero-card::before {
+  content: '';
+  position: absolute;
+  top: -60px; right: -60px;
+  width: 280px; height: 280px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(245,158,11,0.12) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.msn-hero-left { flex: 1; min-width: 0; }
+
+.msn-city-label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 0.15rem;
+}
+.msn-local-time {
+  font-size: 0.78rem;
+  color: var(--text-dim);
+  margin-bottom: 1.25rem;
+}
+
+.msn-hero-center {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+}
+.msn-hero-icon {
+  font-size: 5.5rem;
+  line-height: 1;
+  animation: floatIcon 4s ease-in-out infinite;
+  flex-shrink: 0;
+}
+@keyframes floatIcon {
+  0%,100% { transform: translateY(0); }
+  50%      { transform: translateY(-10px); }
+}
+
+.msn-big-temp {
+  font-size: 6rem;
+  font-weight: 900;
+  line-height: 1;
+  background: linear-gradient(135deg, #fff 0%, rgba(255,255,255,0.8) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: -0.04em;
+}
+.msn-unit { font-size: 2.2rem; font-weight: 400; }
+.msn-desc {
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--text);
+  margin-top: 0.35rem;
+}
+.msn-feels {
+  font-size: 0.88rem;
+  color: var(--text-muted);
+  margin-top: 0.2rem;
+}
+.msn-feels strong { color: var(--orange); }
+
+.msn-hilo {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+  font-size: 1rem;
+  font-weight: 700;
+}
+.hilo-high { color: #f87171; }
+.hilo-sep  { color: var(--text-dim); font-weight: 300; }
+.hilo-low  { color: #60a5fa; }
+
+/* ── Hero right stats ───────────────────────────────────────────────────── */
+.msn-hero-right {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1rem;
+  min-width: 200px;
+}
+.msn-stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  width: 100%;
+}
+.msn-stat-pill {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 12px;
+  padding: 0.75rem 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  transition: background var(--transition), border-color var(--transition);
+}
+.msn-stat-pill:hover {
+  background: rgba(255,255,255,0.1);
+  border-color: rgba(245,158,11,0.3);
+}
+.msn-stat-icon { font-size: 1.3rem; flex-shrink: 0; }
+.msn-stat-val  { font-size: 0.95rem; font-weight: 700; color: var(--text); }
+.msn-stat-val small { font-size: 0.7rem; font-weight: 400; color: var(--text-muted); }
+.msn-stat-lbl  { font-size: 0.7rem; color: var(--text-muted); margin-top: 0.1rem; }
+.msn-updated   { font-size: 0.72rem; color: var(--text-dim); text-align: right; }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   GENERIC SECTION WRAPPER (glass card)
+   ════════════════════════════════════════════════════════════════════════════ */
+.msn-section {
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--card-border);
+  border-radius: 20px;
+  padding: 1.5rem;
+  transition: border-color var(--transition);
+}
+.msn-section:hover { border-color: rgba(245,158,11,0.2); }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   HOURLY STRIP
+   ════════════════════════════════════════════════════════════════════════════ */
+.msn-hourly-strip {
+  display: flex;
+  gap: 0.65rem;
+  overflow-x: auto;
+  padding-bottom: 0.5rem;
+  scrollbar-width: thin;
+}
+.msn-hourly-card {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.9rem 0.75rem;
+  border-radius: 14px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid transparent;
+  min-width: 72px;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.msn-hourly-card:hover { background: rgba(245,158,11,0.1); border-color: rgba(245,158,11,0.3); }
+.msn-hourly-active {
+  background: rgba(245,158,11,0.16) !important;
+  border-color: rgba(245,158,11,0.5) !important;
+  box-shadow: 0 0 16px rgba(245,158,11,0.2);
+}
+.msn-h-time { font-size: 0.72rem; color: var(--text-muted); font-weight: 500; }
+.msn-h-icon { font-size: 1.7rem; }
+.msn-h-temp { font-size: 1rem; font-weight: 700; }
+.msn-h-pop  { font-size: 0.68rem; color: #60a5fa; font-weight: 600; }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   5-DAY FORECAST — EXPANDABLE
+   ════════════════════════════════════════════════════════════════════════════ */
+.msn-forecast-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.msn-day-row {
+  border-radius: 14px;
+  overflow: hidden;
+  transition: background var(--transition);
+}
+.msn-day-header {
+  display: grid;
+  grid-template-columns: 100px 2rem 1fr auto 1.5rem;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.9rem 1.1rem;
+  cursor: pointer;
+  border-radius: 14px;
+  border: 1px solid transparent;
+  transition: all var(--transition);
+  user-select: none;
+}
+.msn-day-header:hover {
+  background: rgba(255,255,255,0.06);
+  border-color: rgba(255,255,255,0.1);
+}
+.msn-day-name  { font-weight: 600; font-size: 0.9rem; }
+.msn-day-icon  { font-size: 1.4rem; text-align: center; }
+.msn-day-desc  { font-size: 0.8rem; color: var(--text-muted); }
+.msn-day-temps { display: flex; align-items: center; gap: 0.3rem; font-weight: 700; font-size: 0.95rem; }
+.msn-day-high  { color: #f87171; }
+.msn-day-sep   { color: var(--text-dim); font-weight: 300; }
+.msn-day-low   { color: #60a5fa; font-size: 0.88rem; }
+.msn-day-chevron {
+  color: var(--text-dim);
+  font-size: 1.1rem;
+  transition: transform 0.3s cubic-bezier(0.4,0,0.2,1);
+  justify-self: center;
+}
+.msn-chev-open { transform: rotate(90deg); color: var(--orange); }
+
+/* Expandable detail panel */
+.msn-day-detail {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.4s cubic-bezier(0.4,0,0.2,1), padding 0.3s ease;
+  background: rgba(255,255,255,0.03);
+  border-top: none;
+}
+.msn-day-open {
+  max-height: 220px;
+  padding: 0.75rem 1rem 1rem;
+  border-top: 1px solid rgba(255,255,255,0.06);
+}
+.msn-day-hourly-strip {
+  display: flex;
+  gap: 0.6rem;
+  overflow-x: auto;
+  padding-bottom: 0.25rem;
+  scrollbar-width: thin;
+}
+.msn-day-hourly-card {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.7rem 0.6rem;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.07);
+  min-width: 64px;
+  transition: background var(--transition);
+}
+.msn-day-hourly-card:hover { background: rgba(255,255,255,0.08); }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   TWO-COLUMN CARDS (AQI + SUN/MOON)
+   ════════════════════════════════════════════════════════════════════════════ */
+.msn-two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+}
+.msn-card {
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--card-border);
+  border-radius: 20px;
+  padding: 1.5rem;
+  transition: border-color var(--transition);
+}
+.msn-card:hover { border-color: rgba(245,158,11,0.2); }
+
+/* ── AQI ───────────────────────────────────────────────────────────────── */
+.msn-aqi-hero { display: flex; flex-direction: column; gap: 1rem; margin-bottom: 1.25rem; }
+.msn-aqi-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.7rem 1.2rem;
+  border-radius: 12px;
+  border: 1px solid;
+  align-self: flex-start;
+}
+.msn-aqi-num  { font-size: 2.2rem; font-weight: 900; }
+.msn-aqi-lbl  { font-size: 1rem; font-weight: 700; }
+.msn-aqi-scale { width: 100%; }
+.msn-aqi-bar {
+  height: 8px;
+  border-radius: 999px;
+  background: linear-gradient(to right, #22c55e, #84cc16, #f59e0b, #ef4444, #7c3aed);
+  position: relative;
+  margin-bottom: 0.4rem;
+}
+.msn-aqi-thumb {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 16px; height: 16px;
+  background: #fff;
+  border-radius: 50%;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+  transition: left 0.6s cubic-bezier(0.4,0,0.2,1);
+}
+.msn-aqi-scale-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.62rem;
+  color: var(--text-dim);
+}
+.msn-pollutants {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.msn-pollutant-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.4rem 0.75rem;
+  background: rgba(255,255,255,0.04);
+  border-radius: 8px;
+  font-size: 0.82rem;
+}
+.msn-poll-name { color: var(--text-muted); }
+.msn-poll-val  { font-weight: 600; color: var(--text); }
+
+/* ── Sun & Moon ─────────────────────────────────────────────────────────── */
+.msn-sun-arc-wrap { margin-bottom: 1.25rem; }
+.msn-sun-svg { width: 100%; max-height: 130px; display: block; }
+.msn-sun-times {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 0.75rem;
+}
+.msn-sun-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.msn-sun-icon  { font-size: 1.5rem; }
+.msn-sun-time  { font-size: 1.1rem; font-weight: 700; color: var(--text); }
+.msn-sun-label { font-size: 0.72rem; color: var(--text-muted); }
+.msn-day-length {
+  text-align: center;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin-top: 0.5rem;
+}
+.msn-day-length span { color: var(--text); font-weight: 600; }
+
+.msn-moon-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.9rem 1rem;
+  background: rgba(255,255,255,0.04);
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.08);
+}
+.msn-moon-icon   { font-size: 2.5rem; }
+.msn-moon-phase  { font-size: 1rem; font-weight: 700; color: var(--text); }
+.msn-moon-illum  { font-size: 0.78rem; color: var(--text-muted); margin-top: 0.2rem; }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   MSN PAGE RESPONSIVE
+   ════════════════════════════════════════════════════════════════════════════ */
+@media (max-width: 720px) {
+  .msn-hero-card { flex-direction: column; padding: 1.5rem; gap: 1.25rem; }
+  .msn-hero-right { align-items: stretch; width: 100%; min-width: unset; }
+  .msn-big-temp { font-size: 4.5rem; }
+  .msn-two-col { grid-template-columns: 1fr; }
+}
+@media (max-width: 480px) {
+  .msn-layout { padding: 0.75rem 1rem 1.5rem; gap: 1rem; }
+  .msn-hero-center { gap: 0.75rem; }
+  .msn-hero-icon { font-size: 4rem; }
+  .msn-big-temp { font-size: 3.8rem; }
+  .msn-day-header { grid-template-columns: 80px 1.8rem 1fr auto 1.2rem; gap: 0.5rem; }
+  .msn-day-desc { display: none; }
+}
+

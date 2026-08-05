@@ -1,5 +1,5 @@
 /**
- * AccuWeather Clone — Frontend JavaScript
+ * GOOD WEATHER — Frontend JavaScript
  * Handles: city search autocomplete, geolocation, hero background updates
  */
 
@@ -172,8 +172,8 @@ document.addEventListener('DOMContentLoaded', () => {
 // ── Recent Cities ────────────────────────────────────────────────────────────
 function saveRecentCity(city) {
   try {
-    let recent = JSON.parse(localStorage.getItem('accu_recent') || '[]');
+    let recent = JSON.parse(localStorage.getItem('goodweather_recent') || localStorage.getItem('accu_recent') || '[]');
     recent = [city, ...recent.filter(c => c !== city)].slice(0, 5);
-    localStorage.setItem('accu_recent', JSON.stringify(recent));
+    localStorage.setItem('goodweather_recent', JSON.stringify(recent));
   } catch (_) {}
 }

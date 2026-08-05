@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>5-Day AI Rain Timeline — GOOD WEATHER</title>
+  <meta name="description" content="5-day AI rain prediction timeline with probability gauges and risk levels." />
+  <link rel="icon" type="image/svg+xml" href="/static/images/favicon.svg" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:     #080f1a;
+      --card:   rgba(255,255,255,0.05);
+      --border: rgba(255,255,255,0.1);
+      --text:   #f0f4f8;
+      --muted:  rgba(240,244,248,0.55);
+      --orange: #f59e0b;
+      --sky:    #06b6d4;
+      --radius: 20px;
+      --tr:     0.3s cubic-bezier(0.4,0,0.2,1);
+    }
+    body {
+      font-family: 'Inter', sans-serif;
+      color: var(--text);
+      background: var(--bg);
+      min-height: 100vh;
+      background-image:
+        radial-gradient(ellipse 900px 500px at 80% -5%, rgba(245,158,11,0.09) 0%, transparent 55%),
+        radial-gradient(ellipse 600px 400px at 5% 90%, rgba(6,182,212,0.06) 0%, transparent 60%);
+    }
+
+    /* ── NAV ───────────────────────────────────────────────────────────── */
+    .nav {
+      background: rgba(0,0,0,0.45);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 2rem; height: 58px;
+      display: flex; align-items: center; justify-content: space-between;
+      position: sticky; top: 0; z-index: 99;
+    }
+    .nav-brand { font-size: 1.1rem; font-weight: 800; color: #fff; text-decoration: none; }
+    .nav-brand span { color: var(--orange); }
+    .nav-right { display: flex; gap: 1.25rem; }
+    .nav-right a { color: var(--muted); text-decoration: none; font-size: 0.88rem; transition: color var(--tr); }
+    .nav-right a:hover { color: #fff; }
+
+    /* ── PAGE ──────────────────────────────────────────────────────────── */
+    .page { max-width: 860px; margin: 0 auto; padding: 2.5rem 1.5rem 5rem; }
+
+    /* ── HEADER ────────────────────────────────────────────────────────── */
+    .page-header {
+      text-align: center; margin-bottom: 2.5rem;
+      animation: fadeUp 0.5s ease both;
+    }
+    .location-badge {
+      display: inline-flex; align-items: center; gap: 0.5rem;
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 999px; padding: 0.4rem 1.2rem;
+      font-size: 0.85rem; font-weight: 600; color: var(--text);
+      margin-bottom: 1rem;
+    }
+    .page-header h1 {
+      font-size: clamp(1.6rem, 4vw, 2.4rem);
+      font-weight: 900; line-height: 1.2;
+      background: linear-gradient(135deg, #fff 0%, rgba(255,255,255,0.7) 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+      margin-bottom: 0.5rem;
+    }
+    .page-header h1 span {
+      background: linear-gradient(135deg, var(--orange), #fbbf24);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+    .page-header p { font-size: 0.95rem; color: var(--muted); }
+
+    /* ── SUMMARY BAR ───────────────────────────────────────────────────── */
+    .summary-bar {
+      display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;
+      margin-bottom: 2rem;
+      animation: fadeUp 0.5s 0.1s ease both;
+    }
+    .sum-pill {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 12px; padding: 0.75rem 1.25rem;
+      display: flex; flex-direction: column; align-items: center; gap: 0.15rem;
+    }
+    .sum-val { font-size: 1.2rem; font-weight: 800; color: var(--orange); }
+    .sum-lbl { font-size: 0.7rem; color: var(--muted); }
+
+    /* ── DAY CARDS ─────────────────────────────────────────────────────── */
+    .timeline { display: flex; flex-direction: column; gap: 1.25rem; }
+
+    .day-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      transition: border-color var(--tr), transform var(--tr), box-shadow var(--tr);
+      cursor: pointer;
+    }
+    .day-card:hover {
+      border-color: rgba(245,158,11,0.35);
+      transform: translateX(4px);
+      box-shadow: 0 8px 40px rgba(0,0,0,0.4);
+    }
+    .day-card.today-card {
+      border-color: rgba(245,158,11,0.4);
+      box-shadow: 0 0 0 1px rgba(245,158,11,0.15), 0 8px 40px rgba(245,158,11,0.1);
+    }
+
+    .day-header {
+      display: grid;
+      grid-template-columns: 130px 1fr auto auto;
+      align-items: center;
+      gap: 1.5rem;
+      padding: 1.4rem 1.75rem;
+    }
+
+    /* Day label */
+    .day-label-wrap {}
+    .day-name { font-size: 1rem; font-weight: 800; color: var(--text); }
+    .day-date { font-size: 0.75rem; color: var(--muted); margin-top: 0.15rem; }
+    .today-tag {
+      display: inline-block;
+      background: rgba(245,158,11,0.15); border: 1px solid rgba(245,158,11,0.35);
+      border-radius: 999px; padding: 0.15rem 0.6rem;
+      font-size: 0.65rem; color: var(--orange); font-weight: 700;
+      margin-top: 0.25rem;
+    }
+
+    /* Probability mini gauge */
+    .prob-gauge {
+      display: flex; flex-direction: column; align-items: center; gap: 0.25rem;
+    }
+    .prob-ring {
+      width: 64px; height: 64px; position: relative;
+    }
+    .prob-svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+    .ring-track { fill: none; stroke: rgba(255,255,255,0.07); stroke-width: 5; }
+    .ring-fill  { fill: none; stroke-width: 5; stroke-linecap: round; transition: stroke-dashoffset 1s ease; }
+    .prob-pct {
+      position: absolute; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.8rem; font-weight: 800;
+    }
+    .prob-label { font-size: 0.65rem; color: var(--muted); }
+
+    /* Quick stats */
+    .day-quick {
+      display: flex; flex-direction: column; gap: 0.4rem;
+    }
+    .dq-item {
+      display: flex; align-items: center; gap: 0.5rem;
+      font-size: 0.8rem; color: var(--muted);
+    }
+    .dq-item strong { color: var(--text); font-weight: 600; }
+
+    /* Risk badge */
+    .risk-badge {
+      display: inline-flex; align-items: center; gap: 0.35rem;
+      padding: 0.45rem 1rem;
+      border-radius: 999px; font-size: 0.78rem; font-weight: 700;
+      white-space: nowrap;
+    }
+
+    /* Expand toggle */
+    .expand-btn {
+      background: transparent; border: none; color: var(--muted);
+      font-size: 1.2rem; cursor: pointer;
+      padding: 0.5rem; border-radius: 8px;
+      transition: color var(--tr), transform var(--tr);
+      align-self: center;
+    }
+    .expand-btn.open { transform: rotate(180deg); color: var(--orange); }
+
+    /* Expanded detail */
+    .day-detail {
+      max-height: 0; overflow: hidden;
+      transition: max-height 0.45s cubic-bezier(0.4,0,0.2,1);
+      border-top: 1px solid transparent;
+    }
+    .day-detail.open {
+      max-height: 400px;
+      border-top-color: var(--border);
+    }
+    .detail-inner { padding: 1.5rem 1.75rem; }
+    .detail-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+      gap: 0.75rem;
+    }
+    .detail-stat {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--border);
+      border-radius: 10px; padding: 0.75rem 0.9rem;
+    }
+    .detail-icon { font-size: 1rem; margin-bottom: 0.25rem; }
+    .detail-val { font-size: 0.95rem; font-weight: 700; }
+    .detail-lbl { font-size: 0.66rem; color: var(--muted); margin-top: 0.1rem; }
+
+    /* ── ACTION ROW ────────────────────────────────────────────────────── */
+    .action-row {
+      display: flex; gap: 0.85rem; margin-top: 2rem; flex-wrap: wrap;
+      animation: fadeUp 0.5s 0.5s ease both;
+    }
+    .btn-primary {
+      display: inline-flex; align-items: center; gap: 0.5rem;
+      background: linear-gradient(135deg, var(--orange), #d97706);
+      color: #fff; border: none; border-radius: 12px;
+      font-family: inherit; font-size: 0.9rem; font-weight: 700;
+      padding: 0.85rem 1.8rem; cursor: pointer; text-decoration: none;
+      transition: all var(--tr);
+      box-shadow: 0 4px 20px rgba(245,158,11,0.3);
+    }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(245,158,11,0.45); }
+    .btn-secondary {
+      display: inline-flex; align-items: center; gap: 0.5rem;
+      background: transparent; color: var(--text);
+      border: 1px solid var(--border); border-radius: 12px;
+      font-family: inherit; font-size: 0.9rem; font-weight: 600;
+      padding: 0.85rem 1.8rem; cursor: pointer; text-decoration: none;
+      transition: all var(--tr);
+    }
+    .btn-secondary:hover { border-color: var(--sky); background: rgba(6,182,212,0.08); }
+
+    /* ── ANIMATIONS ────────────────────────────────────────────────────── */
+    @keyframes fadeUp {
+      from { opacity:0; transform:translateY(20px); }
+      to   { opacity:1; transform:translateY(0); }
+    }
+    .day-card { animation: fadeUp 0.5s ease both; }
+    .day-card:nth-child(1) { animation-delay: 0.1s; }
+    .day-card:nth-child(2) { animation-delay: 0.2s; }
+    .day-card:nth-child(3) { animation-delay: 0.3s; }
+    .day-card:nth-child(4) { animation-delay: 0.4s; }
+    .day-card:nth-child(5) { animation-delay: 0.5s; }
+
+    /* ── RESPONSIVE ────────────────────────────────────────────────────── */
+    @media (max-width: 640px) {
+      .day-header { grid-template-columns: 100px 1fr auto; gap: 0.75rem; }
+      .day-quick { display: none; }
+      .detail-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ── NAV ───────────────────────────────────────────────────────────── -->
+  <nav class="nav">
+    <a href="/" class="nav-brand">GOOD<span>WEATHER</span></a>
+    <div class="nav-right">
+      <a href="/predict-form">AI Predictor</a>
+      <a href="/">Home</a>
+    </div>
+  </nav>
+
+  <div class="page">
+
+    <!-- ── HEADER ─────────────────────────────────────────────────────── -->
+    <div class="page-header">
+      <div class="location-badge">
+        📍 {{ city }}{% if country %}, {{ country }}{% endif %}
+      </div>
+      <h1>5-Day <span>AI Rain</span> Forecast</h1>
+      <p>CatBoost ML model predictions for each day — click any row to expand details.</p>
+    </div>
+
+    <!-- ── SUMMARY BAR ────────────────────────────────────────────────── -->
+    {% set rain_days = days | selectattr('prediction', 'equalto', 'Yes') | list | length %}
+    {% set avg_prob = (days | map(attribute='probability') | sum / days | length) | round(1) %}
+    <div class="summary-bar">
+      <div class="sum-pill">
+        <span class="sum-val">{{ rain_days }}/5</span>
+        <span class="sum-lbl">Rain Days</span>
+      </div>
+      <div class="sum-pill">
+        <span class="sum-val">{{ avg_prob }}%</span>
+        <span class="sum-lbl">Avg Probability</span>
+      </div>
+      <div class="sum-pill">
+        <span class="sum-val">{{ days | length }}</span>
+        <span class="sum-lbl">Days Analysed</span>
+      </div>
+      <div class="sum-pill">
+        <span class="sum-val">85%+</span>
+        <span class="sum-lbl">Model Accuracy</span>
+      </div>
+    </div>
+
+    <!-- ── TIMELINE ───────────────────────────────────────────────────── -->
+    <div class="timeline">
+      {% for day in days %}
+      {% set circ = 188 %}
+      {% set offset = circ - (circ * day.probability / 100) %}
+      {% set color = '#ef4444' if day.probability >= 75 else ('#f97316' if day.probability >= 50 else ('#f59e0b' if day.probability >= 25 else '#22c55e')) %}
+
+      <div class="day-card {% if loop.index0 == 0 %}today-card{% endif %}" onclick="toggleDay({{ loop.index0 }})">
+        <div class="day-header">
+
+          <!-- Day Label -->
+          <div class="day-label-wrap">
+            <div class="day-name">{{ day.day_label }}</div>
+            <div class="day-date">{{ day.date_short }}</div>
+            {% if loop.index0 == 0 %}<div class="today-tag">TODAY</div>{% endif %}
+          </div>
+
+          <!-- Probability Ring -->
+          <div class="prob-gauge">
+            <div class="prob-ring">
+              <svg class="prob-svg" viewBox="0 0 64 64">
+                <circle class="ring-track" cx="32" cy="32" r="27" stroke-dasharray="{{ circ }}" />
+                <circle class="ring-fill" cx="32" cy="32" r="27"
+                  stroke="{{ color }}"
+                  stroke-dasharray="{{ circ }}"
+                  stroke-dashoffset="{{ offset | round(1) }}"
+                  style="filter: drop-shadow(0 0 5px {{ color }}88);" />
+              </svg>
+              <div class="prob-pct" style="color:{{ color }};">{{ day.probability }}%</div>
+            </div>
+            <div class="prob-label">Rain Chance</div>
+          </div>
+
+          <!-- Quick Stats -->
+          {% if day.features %}
+          <div class="day-quick">
+            <div class="dq-item">🌡️ <strong>{{ day.features.min_temp }}° / {{ day.features.max_temp }}°C</strong></div>
+            <div class="dq-item">💧 <strong>{{ day.features.humidity_3pm }}%</strong> humidity</div>
+            <div class="dq-item">💨 <strong>{{ day.features.wind_gust_speed }} km/h</strong> gust</div>
+          </div>
+          {% endif %}
+
+          <!-- Risk Badge -->
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:0.5rem;">
+            <span class="risk-badge" style="background:{{ day.risk_bg }};border:1px solid {{ day.risk_border }};color:{{ day.risk_color }};">
+              {{ '🌧' if day.prediction == 'Yes' else '☀️' }} {{ day.risk_level }}
+            </span>
+            <button class="expand-btn" id="expand-{{ loop.index0 }}" aria-label="Expand">▼</button>
+          </div>
+
+        </div>
+
+        <!-- Expandable Detail -->
+        <div class="day-detail" id="detail-{{ loop.index0 }}">
+          <div class="detail-inner">
+            {% if day.features %}
+            <div class="detail-grid">
+              <div class="detail-stat">
+                <div class="detail-icon">🌡️</div>
+                <div class="detail-val">{{ day.features.min_temp }}° / {{ day.features.max_temp }}°C</div>
+                <div class="detail-lbl">Min / Max Temp</div>
+              </div>
+              <div class="detail-stat">
+                <div class="detail-icon">🌡️</div>
+                <div class="detail-val">{{ day.features.temp_9am }}° / {{ day.features.temp_3pm }}°C</div>
+                <div class="detail-lbl">Temp 9am / 3pm</div>
+              </div>
+              <div class="detail-stat">
+                <div class="detail-icon">💧</div>
+                <div class="detail-val">{{ day.features.humidity_9am }}% / {{ day.features.humidity_3pm }}%</div>
+                <div class="detail-lbl">Humidity 9am / 3pm</div>
+              </div>
+              <div class="detail-stat">
+                <div class="detail-icon">🔵</div>
+                <div class="detail-val">{{ day.features.pressure_9am }} / {{ day.features.pressure_3pm }}</div>
+                <div class="detail-lbl">Pressure hPa 9am / 3pm</div>
+              </div>
+              <div class="detail-stat">
+                <div class="detail-icon">💨</div>
+                <div class="detail-val">{{ day.features.wind_gust_speed }} km/h</div>
+                <div class="detail-lbl">Wind Gust Speed</div>
+              </div>
+              <div class="detail-stat">
+                <div class="detail-icon">🌧️</div>
+                <div class="detail-val">{{ day.features.rainfall }} mm</div>
+                <div class="detail-lbl">Rainfall</div>
+              </div>
+              <div class="detail-stat">
+                <div class="detail-icon">☀️</div>
+                <div class="detail-val">{{ day.features.sunshine }} hrs</div>
+                <div class="detail-lbl">Sunshine (est.)</div>
+              </div>
+              <div class="detail-stat">
+                <div class="detail-icon">💡</div>
+                <div class="detail-val">{{ day.confidence }}%</div>
+                <div class="detail-lbl">Model Confidence</div>
+              </div>
+            </div>
+            {% else %}
+            <p style="color:var(--muted);font-size:0.85rem;">Feature data unavailable for this date.</p>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <!-- ── ACTION ROW ─────────────────────────────────────────────────── -->
+    <div class="action-row">
+      <a href="/predict-form" class="btn-primary">New Prediction</a>
+      <a href="/weather?city={{ city }}" class="btn-secondary">View Live Weather</a>
+    </div>
+
+  </div>
+
+  <script>
+    function toggleDay(idx) {
+      const detail = document.getElementById('detail-' + idx);
+      const btn    = document.getElementById('expand-' + idx);
+      const isOpen = detail.classList.contains('open');
+      detail.classList.toggle('open', !isOpen);
+      btn.classList.toggle('open', !isOpen);
+    }
+  </script>
+</body>
+</html>

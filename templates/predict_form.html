@@ -3,272 +3,526 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AI Rain Predictor — AccuWeather Clone</title>
-  <meta name="description" content="Use our CatBoost machine learning model to predict whether it will rain tomorrow based on today's weather readings." />
-  <link rel="stylesheet" href="/static/css/style.css" />
+  <title>AI Rain Predictor — GOOD WEATHER</title>
+  <meta name="description" content="Advanced AI rain prediction powered by CatBoost ML model with 85%+ accuracy. Select any city and date for instant prediction." />
+  <link rel="icon" type="image/svg+xml" href="/static/images/favicon.svg" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
   <style>
-    body { background: var(--navy); padding: 0; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:       #080f1a;
+      --surface:  #0f1c2e;
+      --card:     rgba(255,255,255,0.05);
+      --border:   rgba(255,255,255,0.1);
+      --text:     #f0f4f8;
+      --muted:    rgba(240,244,248,0.55);
+      --orange:   #f59e0b;
+      --sky:      #06b6d4;
+      --radius:   20px;
+      --tr:       0.3s cubic-bezier(0.4,0,0.2,1);
+    }
+    body {
+      font-family: 'Inter', sans-serif;
+      color: var(--text);
+      background: var(--bg);
+      min-height: 100vh;
+      background-image:
+        radial-gradient(ellipse 800px 500px at 100% 0%, rgba(245,158,11,0.1) 0%, transparent 60%),
+        radial-gradient(ellipse 600px 400px at 0% 100%, rgba(6,182,212,0.07) 0%, transparent 60%);
+    }
 
-    .predict-hero {
-      background: linear-gradient(135deg, rgba(244,121,33,0.15) 0%, rgba(11,26,46,0) 60%);
-      border-bottom: 1px solid rgba(255,255,255,0.06);
-      padding: 2rem 2rem 1.5rem;
+    /* ── NAV ──────────────────────────────────────────────────────────── */
+    .nav {
+      background: rgba(0,0,0,0.45);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 2rem;
+      height: 58px;
+      display: flex; align-items: center; justify-content: space-between;
+      position: sticky; top: 0; z-index: 99;
+    }
+    .nav-brand { font-size: 1.1rem; font-weight: 800; color: #fff; text-decoration: none; }
+    .nav-brand span { color: var(--orange); }
+    .nav-back { color: var(--muted); text-decoration: none; font-size: 0.88rem; transition: color var(--tr); display: flex; align-items: center; gap: 0.4rem; }
+    .nav-back:hover { color: var(--orange); }
+
+    /* ── HERO SECTION ─────────────────────────────────────────────────── */
+    .hero {
+      text-align: center;
+      padding: 3.5rem 1.5rem 0;
+      position: relative;
+    }
+    .hero-badge {
+      display: inline-flex; align-items: center; gap: 0.5rem;
+      background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.3);
+      border-radius: 999px; padding: 0.4rem 1.2rem;
+      font-size: 0.78rem; color: var(--orange); font-weight: 600;
+      margin-bottom: 1.25rem;
+      animation: fadeUp 0.5s ease both;
+    }
+    .hero h1 {
+      font-size: clamp(1.9rem, 5vw, 3rem);
+      font-weight: 900; line-height: 1.15;
+      background: linear-gradient(135deg, #fff 0%, rgba(255,255,255,0.7) 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+      margin-bottom: 0.75rem;
+      animation: fadeUp 0.5s 0.1s ease both;
+    }
+    .hero h1 span {
+      background: linear-gradient(135deg, var(--orange), #fbbf24);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+    .hero p {
+      font-size: 1rem; color: var(--muted); max-width: 520px; margin: 0 auto;
+      line-height: 1.6;
+      animation: fadeUp 0.5s 0.2s ease both;
+    }
+
+    /* ── STATS ROW ────────────────────────────────────────────────────── */
+    .stats-row {
+      display: flex; justify-content: center; gap: 2rem; flex-wrap: wrap;
+      margin-top: 2rem;
+      animation: fadeUp 0.5s 0.3s ease both;
+    }
+    .stat-pill {
+      display: flex; flex-direction: column; align-items: center; gap: 0.15rem;
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 14px; padding: 1rem 1.5rem;
+      min-width: 110px;
+    }
+    .stat-pill .val { font-size: 1.4rem; font-weight: 800; color: var(--orange); }
+    .stat-pill .lbl { font-size: 0.72rem; color: var(--muted); font-weight: 500; }
+
+    /* ── MAIN FORM CARD ───────────────────────────────────────────────── */
+    .form-wrap {
+      max-width: 680px; margin: 2.5rem auto 0;
+      padding: 0 1.5rem 5rem;
+    }
+    .form-card {
+      background: var(--card);
+      backdrop-filter: blur(24px);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      overflow: hidden;
+      box-shadow: 0 24px 80px rgba(0,0,0,0.5);
+      animation: fadeUp 0.6s 0.2s ease both;
+    }
+    .form-card-header {
+      background: linear-gradient(135deg, rgba(245,158,11,0.12) 0%, rgba(245,158,11,0.02) 100%);
+      border-bottom: 1px solid var(--border);
+      padding: 1.5rem 2rem;
+    }
+    .form-card-header h2 { font-size: 1.1rem; font-weight: 700; margin-bottom: 0.25rem; }
+    .form-card-header p { font-size: 0.82rem; color: var(--muted); }
+    .form-card-body { padding: 2rem; }
+
+    /* ── MODE TOGGLE ──────────────────────────────────────────────────── */
+    .mode-toggle {
+      display: flex; background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border); border-radius: 12px;
+      overflow: hidden; margin-bottom: 2rem;
+    }
+    .mode-btn {
+      flex: 1; padding: 0.7rem 1rem;
+      background: transparent; border: none; color: var(--muted);
+      font-family: inherit; font-size: 0.85rem; font-weight: 600;
+      cursor: pointer; transition: all var(--tr); text-align: center;
+    }
+    .mode-btn.active {
+      background: var(--orange); color: #fff;
+      box-shadow: 0 0 20px rgba(245,158,11,0.3);
+    }
+
+    /* ── FORM FIELDS ──────────────────────────────────────────────────── */
+    .field-group { margin-bottom: 1.5rem; }
+    .field-label {
+      display: block; font-size: 0.82rem; font-weight: 700;
+      color: var(--text); margin-bottom: 0.55rem;
+      display: flex; align-items: center; gap: 0.4rem;
+    }
+    .field-hint { font-size: 0.75rem; color: var(--muted); margin-top: 0.35rem; }
+
+    .input-wrap { position: relative; }
+    .field-input {
+      width: 100%;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      color: var(--text);
+      font-family: inherit; font-size: 0.95rem;
+      padding: 0.9rem 1.1rem;
+      outline: none;
+      transition: border-color var(--tr), box-shadow var(--tr), background var(--tr);
+    }
+    .field-input:focus {
+      border-color: var(--orange);
+      box-shadow: 0 0 0 3px rgba(245,158,11,0.15);
+      background: rgba(255,255,255,0.08);
+    }
+    .field-input::placeholder { color: rgba(240,244,248,0.3); }
+
+    /* Search dropdown */
+    .search-dropdown {
+      position: absolute; top: calc(100% + 6px); left: 0; right: 0;
+      background: #1a2840; border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 14px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+      overflow: hidden; z-index: 200; display: none;
+    }
+    .search-dropdown.open { display: block; animation: dropIn 0.2s ease; }
+    @keyframes dropIn { from { opacity:0; transform:translateY(-8px); } to { opacity:1; transform:translateY(0); } }
+    .search-item {
+      display: flex; align-items: center; gap: 0.75rem;
+      padding: 0.85rem 1.1rem; cursor: pointer;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+      transition: background var(--tr);
+    }
+    .search-item:last-child { border-bottom: none; }
+    .search-item:hover { background: rgba(245,158,11,0.1); }
+    .search-item .s-icon { color: var(--orange); font-size: 0.95rem; }
+    .search-item .s-name { font-size: 0.9rem; font-weight: 600; color: var(--text); }
+    .search-item .s-country { font-size: 0.75rem; color: var(--muted); margin-left: auto; }
+
+    /* ── LIVE PREVIEW CARD ────────────────────────────────────────────── */
+    #live-preview {
+      background: rgba(6,182,212,0.06);
+      border: 1px solid rgba(6,182,212,0.2);
+      border-radius: 14px; padding: 1rem 1.25rem;
+      margin-bottom: 1.5rem;
+      display: none;
+      animation: fadeIn 0.3s ease;
+    }
+    .preview-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; }
+    .preview-city { font-weight: 700; font-size: 0.95rem; }
+    .preview-coords { font-size: 0.75rem; color: var(--muted); }
+    .preview-badge {
+      background: rgba(6,182,212,0.15); border: 1px solid rgba(6,182,212,0.3);
+      border-radius: 999px; padding: 0.25rem 0.8rem;
+      font-size: 0.72rem; color: var(--sky); font-weight: 600;
+    }
+
+    /* ── LOADING STATE ────────────────────────────────────────────────── */
+    .btn-submit {
+      width: 100%; padding: 1.1rem;
+      background: linear-gradient(135deg, var(--orange) 0%, #d97706 100%);
+      color: #fff; border: none; border-radius: 14px;
+      font-family: inherit; font-size: 1rem; font-weight: 700;
+      cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.6rem;
+      transition: all var(--tr);
+      box-shadow: 0 6px 24px rgba(245,158,11,0.35);
+    }
+    .btn-submit:hover { transform: translateY(-2px); box-shadow: 0 10px 32px rgba(245,158,11,0.5); }
+    .btn-submit:active { transform: translateY(0); }
+    .btn-submit.loading {
+      background: linear-gradient(135deg, #92400e, #78350f);
+      cursor: not-allowed; pointer-events: none;
+    }
+    .spinner {
+      width: 20px; height: 20px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      display: none;
+      animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── INFO STRIP ───────────────────────────────────────────────────── */
+    .info-strip {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--border);
+      border-radius: 12px; padding: 1rem 1.1rem;
+      margin-top: 1.5rem;
+      font-size: 0.8rem; color: var(--muted); line-height: 1.55;
+    }
+    .info-strip strong { color: var(--sky); }
+
+    /* ── HOW IT WORKS ─────────────────────────────────────────────────── */
+    .how-it-works {
+      max-width: 680px; margin: 0 auto;
+      padding: 0 1.5rem;
+    }
+    .how-title {
+      text-align: center;
+      font-size: 0.7rem; font-weight: 700; letter-spacing: 0.13em;
+      text-transform: uppercase; color: var(--muted);
+      margin-bottom: 1.25rem;
+    }
+    .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+    .step {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 16px; padding: 1.25rem;
       text-align: center;
     }
-    .predict-hero h1 {
-      font-size: clamp(1.6rem, 4vw, 2.2rem);
-      font-weight: 900;
-      background: linear-gradient(135deg, var(--orange) 0%, #fbbf24 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-      margin-bottom: 0.4rem;
+    .step-num {
+      width: 32px; height: 32px; border-radius: 50%;
+      background: rgba(245,158,11,0.15); border: 1px solid rgba(245,158,11,0.3);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.8rem; font-weight: 800; color: var(--orange);
+      margin: 0 auto 0.75rem;
     }
-    .predict-hero p { color: var(--text-muted); font-size: 0.95rem; }
-    .predict-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.4rem;
-      margin-top: 0.75rem;
-      padding: 0.3rem 1rem;
-      background: rgba(244,121,33,0.12);
-      border: 1px solid rgba(244,121,33,0.3);
-      border-radius: 999px;
-      font-size: 0.78rem;
-      color: var(--orange);
-      font-weight: 600;
-    }
+    .step-icon { font-size: 1.5rem; margin-bottom: 0.5rem; }
+    .step-title { font-size: 0.85rem; font-weight: 700; margin-bottom: 0.3rem; }
+    .step-desc { font-size: 0.75rem; color: var(--muted); line-height: 1.5; }
 
-    .predict-body {
-      max-width: 960px;
-      margin: 2rem auto;
-      padding: 0 1.5rem 3rem;
+    /* ── ANIMATIONS ───────────────────────────────────────────────────── */
+    @keyframes fadeUp {
+      from { opacity:0; transform:translateY(16px); }
+      to   { opacity:1; transform:translateY(0); }
     }
+    @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
 
-    .form-card {
-      background: var(--glass-bg);
-      backdrop-filter: var(--glass-blur);
-      border: 1px solid var(--card-border);
-      border-radius: var(--radius-xl);
-      padding: 2rem 2.5rem;
-      box-shadow: var(--shadow-card);
+    /* ── RESPONSIVE ───────────────────────────────────────────────────── */
+    @media (max-width: 500px) {
+      .form-card-body { padding: 1.5rem; }
+      .stats-row { gap: 0.75rem; }
+      .steps { grid-template-columns: 1fr; }
     }
-
-    .section-title {
-      font-size: 0.7rem;
-      font-weight: 700;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      color: var(--text-muted);
-      margin: 1.75rem 0 1rem;
-      padding-bottom: 0.5rem;
-      border-bottom: 1px solid var(--card-border);
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-    }
-    .section-title:first-child { margin-top: 0; }
-
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 1rem 1.5rem;
-    }
-
-    .field { display: flex; flex-direction: column; gap: 0.4rem; }
-    .field label { font-size: 0.82rem; font-weight: 500; color: var(--text-muted); }
-    .field input, .field select {
-      background: rgba(255,255,255,0.05);
-      border: 1px solid var(--card-border);
-      border-radius: var(--radius-sm);
-      color: var(--text);
-      font-family: inherit;
-      font-size: 0.92rem;
-      padding: 0.65rem 0.9rem;
-      transition: border-color var(--transition), box-shadow var(--transition);
-      outline: none;
-      width: 100%;
-    }
-    .field input:focus, .field select:focus {
-      border-color: var(--orange);
-      box-shadow: 0 0 0 3px var(--orange-glow);
-    }
-    .field input::placeholder { color: rgba(255,255,255,0.25); }
-    .field select option { background: #1a2035; color: var(--text); }
-
-    .btn-wrap { margin-top: 2.25rem; text-align: center; }
-    .btn-predict {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.5rem;
-      background: linear-gradient(135deg, var(--orange) 0%, #d4631a 100%);
-      color: #fff;
-      border: none;
-      border-radius: var(--radius-md);
-      font-family: inherit;
-      font-size: 1rem;
-      font-weight: 700;
-      padding: 0.9rem 2.8rem;
-      cursor: pointer;
-      box-shadow: 0 4px 24px var(--orange-glow);
-      transition: transform var(--transition), box-shadow var(--transition), filter var(--transition);
-    }
-    .btn-predict:hover {
-      transform: translateY(-3px);
-      box-shadow: 0 8px 32px rgba(244,121,33,0.5);
-      filter: brightness(1.08);
-    }
-    .btn-predict:active { transform: translateY(0); }
-    .predict-icon { font-size: 1.2rem; animation: float 3s ease-in-out infinite; }
-    @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-5px)} }
-
-    @media (max-width:600px) { .form-card { padding:1.5rem 1rem; } }
   </style>
 </head>
 <body>
 
-  <!-- ── Topbar ──────────────────────────────────────────────────────────── -->
-  <div class="topbar">
-    <a class="topbar-item" href="/">← AccuWeather Home</a>
-    <span class="topbar-sep">|</span>
-    <a class="topbar-item active" href="#">AI Rain Predictor</a>
-    <a class="topbar-item" href="#">Superior Accuracy™</a>
-  </div>
-
-  <!-- ── Navbar ─────────────────────────────────────────────────────────── -->
-  <nav class="navbar">
-    <a href="/" class="navbar-brand">
-      <div class="navbar-logo-icon">🌤</div>
-      <span class="navbar-logo-text"><span>Accu</span>Weather</span>
-    </a>
-    <a href="/" class="back-link" style="color:var(--text-muted);">← Back to Weather</a>
+  <!-- ── NAV ───────────────────────────────────────────────────────────── -->
+  <nav class="nav">
+    <a href="/" class="nav-brand">GOOD<span>WEATHER</span></a>
+    <a href="/" class="nav-back">← Back to Home</a>
   </nav>
 
-  <!-- ── Hero ───────────────────────────────────────────────────────────── -->
-  <div class="predict-hero">
-    <h1>🤖 AI Rain Predictor</h1>
-    <p>Enter today's weather readings to predict if it will rain tomorrow.</p>
-    <div class="predict-badge">⚡ Powered by CatBoost · 85%+ Accuracy · 145K Training Rows</div>
-  </div>
+  <!-- ── HERO ──────────────────────────────────────────────────────────── -->
+  <div class="hero">
+    <div class="hero-badge">AI-Powered · 85%+ Accuracy · 145K Training Rows</div>
+    <h1>Smart <span>AI Rain</span> Predictor</h1>
+    <p>Select any city and date. We auto-fetch live weather data and run our CatBoost ML model to predict rain probability with confidence scores.</p>
 
-  <!-- ── Form ───────────────────────────────────────────────────────────── -->
-  <div class="predict-body">
-    <div class="form-card">
-      <form action="/predict" method="POST">
-
-        <!-- Temperature -->
-        <p class="section-title">🌡 Temperature</p>
-        <div class="grid">
-          <div class="field">
-            <label for="min_temp">Min Temp (°C)</label>
-            <input type="number" id="min_temp" name="min_temp" step="0.1" placeholder="e.g. 13.4" required />
-          </div>
-          <div class="field">
-            <label for="max_temp">Max Temp (°C)</label>
-            <input type="number" id="max_temp" name="max_temp" step="0.1" placeholder="e.g. 22.9" required />
-          </div>
-          <div class="field">
-            <label for="temp_9am">Temp at 9am (°C)</label>
-            <input type="number" id="temp_9am" name="temp_9am" step="0.1" placeholder="e.g. 16.9" required />
-          </div>
-          <div class="field">
-            <label for="temp_3pm">Temp at 3pm (°C)</label>
-            <input type="number" id="temp_3pm" name="temp_3pm" step="0.1" placeholder="e.g. 21.8" required />
-          </div>
-        </div>
-
-        <!-- Rainfall & Sunshine -->
-        <p class="section-title">🌧 Rainfall & Sunshine</p>
-        <div class="grid">
-          <div class="field">
-            <label for="rainfall">Rainfall (mm)</label>
-            <input type="number" id="rainfall" name="rainfall" step="0.1" min="0" placeholder="e.g. 0.6" required />
-          </div>
-          <div class="field">
-            <label for="evaporation">Evaporation (mm)</label>
-            <input type="number" id="evaporation" name="evaporation" step="0.1" min="0" placeholder="e.g. 4.8" required />
-          </div>
-          <div class="field">
-            <label for="sunshine">Sunshine (hours)</label>
-            <input type="number" id="sunshine" name="sunshine" step="0.1" min="0" max="14.5" placeholder="e.g. 8.4" required />
-          </div>
-          <div class="field">
-            <label for="rain_today">Did it Rain Today?</label>
-            <select id="rain_today" name="rain_today" required>
-              <option value="" disabled selected>Select…</option>
-              <option value="0">No</option>
-              <option value="1">Yes</option>
-            </select>
-          </div>
-        </div>
-
-        <!-- Wind -->
-        <p class="section-title">💨 Wind</p>
-        <div class="grid">
-          <div class="field">
-            <label for="wind_gust_speed">Wind Gust Speed (km/h)</label>
-            <input type="number" id="wind_gust_speed" name="wind_gust_speed" step="0.1" min="0" placeholder="e.g. 44.0" required />
-          </div>
-          <div class="field">
-            <label for="wind_speed_9am">Wind Speed at 9am (km/h)</label>
-            <input type="number" id="wind_speed_9am" name="wind_speed_9am" step="0.1" min="0" placeholder="e.g. 20.0" required />
-          </div>
-          <div class="field">
-            <label for="wind_speed_3pm">Wind Speed at 3pm (km/h)</label>
-            <input type="number" id="wind_speed_3pm" name="wind_speed_3pm" step="0.1" min="0" placeholder="e.g. 24.0" required />
-          </div>
-        </div>
-
-        <!-- Humidity & Pressure -->
-        <p class="section-title">💧 Humidity & Pressure</p>
-        <div class="grid">
-          <div class="field">
-            <label for="humidity_9am">Humidity at 9am (%)</label>
-            <input type="number" id="humidity_9am" name="humidity_9am" step="0.1" min="0" max="100" placeholder="e.g. 71.0" required />
-          </div>
-          <div class="field">
-            <label for="humidity_3pm">Humidity at 3pm (%)</label>
-            <input type="number" id="humidity_3pm" name="humidity_3pm" step="0.1" min="0" max="100" placeholder="e.g. 22.0" required />
-          </div>
-          <div class="field">
-            <label for="pressure_9am">Pressure at 9am (hPa)</label>
-            <input type="number" id="pressure_9am" name="pressure_9am" step="0.1" placeholder="e.g. 1007.7" required />
-          </div>
-          <div class="field">
-            <label for="pressure_3pm">Pressure at 3pm (hPa)</label>
-            <input type="number" id="pressure_3pm" name="pressure_3pm" step="0.1" placeholder="e.g. 1007.1" required />
-          </div>
-        </div>
-
-        <!-- Date -->
-        <p class="section-title">📅 Date</p>
-        <div class="grid">
-          <div class="field">
-            <label for="day">Day</label>
-            <input type="number" id="day" name="day" min="1" max="31" placeholder="e.g. 1" required />
-          </div>
-          <div class="field">
-            <label for="month">Month</label>
-            <input type="number" id="month" name="month" min="1" max="12" placeholder="e.g. 12" required />
-          </div>
-          <div class="field">
-            <label for="year">Year</label>
-            <input type="number" id="year" name="year" min="2008" max="2030" placeholder="e.g. 2024" required />
-          </div>
-        </div>
-
-        <div class="btn-wrap">
-          <button type="submit" class="btn-predict">
-            <span class="predict-icon">🌧</span> Predict Rain Tomorrow
-          </button>
-        </div>
-      </form>
+    <div class="stats-row">
+      <div class="stat-pill"><span class="val">85%+</span><span class="lbl">Model Accuracy</span></div>
+      <div class="stat-pill"><span class="val">18</span><span class="lbl">Auto Features</span></div>
+      <div class="stat-pill"><span class="val">145K</span><span class="lbl">Training Rows</span></div>
+      <div class="stat-pill"><span class="val">5</span><span class="lbl">Day Forecast</span></div>
     </div>
   </div>
 
-  <footer class="footer">
-    <p>© 2025 AccuWeather Clone · <a href="/">Home</a> · <a href="/weather?city=Hyderabad">Live Weather</a></p>
-  </footer>
+  <!-- ── FORM ───────────────────────────────────────────────────────────── -->
+  <div class="form-wrap">
+    <div class="form-card">
+      <div class="form-card-header">
+        <h2>Configure Your Prediction</h2>
+        <p>Choose single-day analysis or get a 5-day AI rain timeline</p>
+      </div>
+      <div class="form-card-body">
 
+        <!-- Mode Toggle -->
+        <div class="mode-toggle" id="mode-toggle">
+          <button class="mode-btn active" id="mode-single" type="button" onclick="setMode('single')">
+            Single Day Analysis
+          </button>
+          <button class="mode-btn" id="mode-multi" type="button" onclick="setMode('multi')">
+            5-Day AI Timeline
+          </button>
+        </div>
+
+        <!-- Single Day Form -->
+        <form id="form-single" action="/predict" method="POST" onsubmit="handleSubmit(this)">
+          <input type="hidden" id="city-hidden-s" name="city" value="London" />
+          <input type="hidden" id="lat-hidden-s" name="lat" value="" />
+          <input type="hidden" id="lon-hidden-s" name="lon" value="" />
+
+          <!-- City Search -->
+          <div class="field-group">
+            <label class="field-label" for="city-search-s">📍 Target City</label>
+            <div class="input-wrap">
+              <input type="text" class="field-input" id="city-search-s"
+                placeholder="Search city... (e.g. London, Hyderabad, Tokyo)"
+                autocomplete="off" value="London" />
+              <div class="search-dropdown" id="dropdown-s"></div>
+            </div>
+            <div class="field-hint">Type at least 2 letters to search worldwide cities.</div>
+          </div>
+
+          <!-- Live Preview -->
+          <div id="live-preview">
+            <div class="preview-row">
+              <div>
+                <div class="preview-city" id="preview-city-text">London, GB</div>
+                <div class="preview-coords" id="preview-coords-text">51.51° N, -0.13° E</div>
+              </div>
+              <div class="preview-badge">Location Selected</div>
+            </div>
+          </div>
+
+          <!-- Date -->
+          <div class="field-group" id="date-field-single">
+            <label class="field-label" for="date-s">📅 Forecast Date</label>
+            <input type="date" class="field-input" id="date-s" name="date" required />
+            <div class="field-hint">Next 5 days available (OpenWeatherMap forecast horizon).</div>
+          </div>
+
+          <button type="submit" class="btn-submit" id="btn-s">
+            <div class="spinner" id="spinner-s"></div>
+            <span id="btn-s-text">Run AI Prediction</span>
+          </button>
+        </form>
+
+        <!-- Multi Day Form -->
+        <form id="form-multi" action="/predict-multi" method="POST" style="display:none;" onsubmit="handleSubmit(this)">
+          <input type="hidden" id="city-hidden-m" name="city" value="London" />
+          <input type="hidden" id="lat-hidden-m" name="lat" value="" />
+          <input type="hidden" id="lon-hidden-m" name="lon" value="" />
+
+          <div class="field-group">
+            <label class="field-label" for="city-search-m">📍 Target City</label>
+            <div class="input-wrap">
+              <input type="text" class="field-input" id="city-search-m"
+                placeholder="Search city..."
+                autocomplete="off" value="London" />
+              <div class="search-dropdown" id="dropdown-m"></div>
+            </div>
+            <div class="field-hint">Will predict rain probability for all 5 days at once.</div>
+          </div>
+
+          <div id="live-preview-m" style="display:none;" class="info-strip">
+            <strong id="preview-city-m">London, GB</strong> — 5-day prediction timeline will be generated.
+          </div>
+
+          <button type="submit" class="btn-submit" id="btn-m">
+            <div class="spinner" id="spinner-m"></div>
+            <span id="btn-m-text">Generate 5-Day AI Timeline</span>
+          </button>
+        </form>
+
+        <!-- Info strip -->
+        <div class="info-strip">
+          <strong>Auto-Feature Pipeline:</strong>
+          Temperatures, humidity, wind, pressure, and rainfall are fetched live from OpenWeatherMap.
+          Evaporation uses the Hargreaves model. Sunshine is estimated from cloud cover density.
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ── HOW IT WORKS ───────────────────────────────────────────────────── -->
+  <div class="how-it-works" style="margin-top:2rem; padding-bottom:4rem;">
+    <div class="how-title">How It Works</div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-icon">📍</div>
+        <div class="step-title">Select City & Date</div>
+        <div class="step-desc">Choose any city worldwide and a forecast date within the next 5 days.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-icon">🌐</div>
+        <div class="step-title">Live Data Fetched</div>
+        <div class="step-desc">18 weather features are automatically derived from live OpenWeatherMap API data.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-icon">🤖</div>
+        <div class="step-title">AI Model Runs</div>
+        <div class="step-desc">CatBoost model predicts rain probability, risk level, and confidence score instantly.</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const MODES = { single: null, multi: null };
+
+    function setMode(mode) {
+      document.getElementById('form-single').style.display = mode === 'single' ? 'block' : 'none';
+      document.getElementById('form-multi').style.display  = mode === 'multi'  ? 'block' : 'none';
+      document.getElementById('mode-single').classList.toggle('active', mode === 'single');
+      document.getElementById('mode-multi').classList.toggle('active', mode === 'multi');
+    }
+
+    function handleSubmit(form) {
+      const suffix = form.id === 'form-single' ? 's' : 'm';
+      const btn    = document.getElementById('btn-' + suffix);
+      const spinner= document.getElementById('spinner-' + suffix);
+      const btnTxt = document.getElementById('btn-' + suffix + '-text');
+      btn.classList.add('loading');
+      spinner.style.display = 'block';
+      btnTxt.textContent = 'Predicting...';
+    }
+
+    // ── Autocomplete helper ──────────────────────────────────────────────
+    let searchTimer = null;
+
+    function initSearch(inputId, dropdownId, hiddenCity, hiddenLat, hiddenLon, previewId, previewCityId, previewCoordsId) {
+      const input    = document.getElementById(inputId);
+      const dropdown = document.getElementById(dropdownId);
+      const preview  = previewId ? document.getElementById(previewId) : null;
+
+      input.addEventListener('input', () => {
+        document.getElementById(hiddenCity).value = input.value;
+        document.getElementById(hiddenLat).value  = '';
+        document.getElementById(hiddenLon).value  = '';
+        if (preview) preview.style.display = 'none';
+        clearTimeout(searchTimer);
+        if (input.value.length < 2) { dropdown.classList.remove('open'); return; }
+        searchTimer = setTimeout(() => fetchSuggestions(input.value, dropdown, hiddenCity, hiddenLat, hiddenLon, preview, previewCityId, previewCoordsId), 280);
+      });
+
+      document.addEventListener('click', e => {
+        if (!input.contains(e.target) && !dropdown.contains(e.target)) dropdown.classList.remove('open');
+      });
+    }
+
+    function fetchSuggestions(q, dropdown, hiddenCity, hiddenLat, hiddenLon, preview, previewCityId, previewCoordsId) {
+      fetch('/api/search?q=' + encodeURIComponent(q))
+        .then(r => r.json())
+        .then(data => {
+          if (!data.length) { dropdown.classList.remove('open'); return; }
+          dropdown.innerHTML = data.map(item => `
+            <div class="search-item" onclick="selectCity('${item.name}','${item.country}',${item.lat},${item.lon},'${hiddenCity}','${hiddenLat}','${hiddenLon}','${dropdown.id}',${previewCityId ? `'${previewCityId}'` : null},${previewCoordsId ? `'${previewCoordsId}'` : null},'${item.state || ''}')">
+              <span class="s-icon">📍</span>
+              <span class="s-name">${item.name}${item.state ? ', ' + item.state : ''}</span>
+              <span class="s-country">${item.country}</span>
+            </div>
+          `).join('');
+          dropdown.classList.add('open');
+        });
+    }
+
+    function selectCity(name, country, lat, lon, hiddenCity, hiddenLat, hiddenLon, dropdownId, previewCityId, previewCoordsId, state) {
+      const suffix = dropdownId.includes('-s') ? 's' : 'm';
+      const input  = document.getElementById('city-search-' + suffix);
+      input.value  = name + (state ? ', ' + state : '') + ', ' + country;
+      document.getElementById(hiddenCity).value = name;
+      document.getElementById(hiddenLat).value  = lat;
+      document.getElementById(hiddenLon).value  = lon;
+      document.getElementById(dropdownId).classList.remove('open');
+
+      if (suffix === 's') {
+        const preview = document.getElementById('live-preview');
+        document.getElementById('preview-city-text').textContent = name + ', ' + country;
+        document.getElementById('preview-coords-text').textContent =
+          Math.abs(lat).toFixed(2) + '° ' + (lat >= 0 ? 'N' : 'S') + ', ' +
+          Math.abs(lon).toFixed(2) + '° ' + (lon >= 0 ? 'E' : 'W');
+        preview.style.display = 'block';
+      } else {
+        const pm = document.getElementById('live-preview-m');
+        document.getElementById('preview-city-m').textContent = name + ', ' + country;
+        pm.style.display = 'block';
+      }
+    }
+
+    // ── Date Picker ───────────────────────────────────────────────────────
+    const today = new Date();
+    const maxDate = new Date(today);
+    maxDate.setDate(maxDate.getDate() + 4);
+    const toStr = d => d.toISOString().split('T')[0];
+
+    const ds = document.getElementById('date-s');
+    if (ds) { ds.min = toStr(today); ds.max = toStr(maxDate); ds.value = toStr(today); }
+
+    // ── Init autocomplete for both forms ──────────────────────────────────
+    initSearch('city-search-s', 'dropdown-s', 'city-hidden-s', 'lat-hidden-s', 'lon-hidden-s', 'live-preview', 'preview-city-text', 'preview-coords-text');
+    initSearch('city-search-m', 'dropdown-m', 'city-hidden-m', 'lat-hidden-m', 'lon-hidden-m', 'live-preview-m', 'preview-city-m', null);
+
+    // ── Check for multi param in URL ──────────────────────────────────────
+    if (new URLSearchParams(location.search).get('multi') === '1') setMode('multi');
+  </script>
 </body>
 </html>
