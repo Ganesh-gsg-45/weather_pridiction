@@ -98,9 +98,8 @@ class PredictPipeline:
                 prob_pct = round(prob_val * 100, 1)
                 label    = "Yes" if prob_val >= DECISION_THRESHOLD else "No"
 
-                # Confidence = distance from tuned decision threshold (scaled 0-100)
-                confidence = round(abs(prob_val - DECISION_THRESHOLD) * 160, 1)
-                confidence = min(100.0, max(50.0, 50.0 + confidence))
+                # Confidence = distance from maximum uncertainty (0.5), smoothly scaled 50%-100%
+                confidence = round(50.0 + abs(prob_val - 0.5) * 100.0, 1)
 
                 # Risk level based on rain probability
                 if prob_pct < 25.0:
