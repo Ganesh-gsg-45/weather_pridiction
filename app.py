@@ -21,16 +21,16 @@ OWM_GEO  = "https://api.openweathermap.org/geo/1.0"
 # ── Helpers ────────────────────────────────────────────────────────────────────
 PREDICTION_FEEDBACK_LOG = os.path.join("logs", "prediction_feedback.csv")
 
-def log_prediction_feedback(city: str, date_str: str, prediction: str, probability: float, confidence: float, features: dict):
+def log_prediction_feedback(city: str, lat: float, lon: float, date_str: str, prediction: str, probability: float, confidence: float, features: dict):
     """
-    Log live inference predictions to CSV feedback log for continuous monitoring
-    and post-hoc evaluation against next-day actual weather outcomes.
+    Log live inference predictions to CSV feedback log with exact geographical
+    coordinates for accurate historical outcome fetching.
     """
     try:
         os.makedirs(os.path.dirname(PREDICTION_FEEDBACK_LOG), exist_ok=True)
         with open(PREDICTION_FEEDBACK_LOG, mode="a", encoding="utf-8") as f:
             if f.tell() == 0:
-                f.write("timestamp,city,predict_date,prediction,probability,confidence,temp_max,temp_min,precip_sum,weather_code\n")
+                f.write("timestamp,city,lat,lon,predict_date,prediction,probability,confidence,temp_max,temp_min,precip_sum,weather_code\n")
             
             ts = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
             tmax = features.get("temperature_2m_max", "")
@@ -38,8 +38,8 @@ def log_prediction_feedback(city: str, date_str: str, prediction: str, probabili
             prec = features.get("precipitation_sum", "")
             wcode = features.get("weather_code", "")
             
-            f.write(f"{ts},{city},{date_str},{prediction},{probability},{confidence},{tmax},{tmin},{prec},{wcode}\n")
-            logger.info(f"Logged prediction feedback -> {city} ({date_str}): {prediction} ({probability}%)")
+            f.write(f"{ts},{city},{lat},{lon},{date_str},{prediction},{probability},{confidence},{tmax},{tmin},{prec},{wcode}\n")
+            logger.info(f"Logged prediction feedback -> {city} ({lat},{lon}) [{date_str}]: {prediction} ({probability}%)")
     except Exception as exc:
         logger.warning(f"Could not write prediction log: {exc}")
 
@@ -561,8 +561,10 @@ def derive_features_from_owm(
         "month":                       target_dt.month,
         "year":                        target_dt.year,
         "city":                        resolved_city,
-        # ── Display-only ─────────────────────────────────────────────────────
+        # ── Display & Metadata ───────────────────────────────────────────────
         "resolved_city": resolved_city,
+        "lat":           coord_lat,
+        "lon":           coord_lon,
         "country":       current.get("sys", {}).get("country", ""),
         "date_str":      target_date_str,
     }
@@ -613,6 +615,8 @@ def predict():
         # Log prediction to feedback tracker for production monitoring
         log_prediction_feedback(
             city        = feat["resolved_city"],
+            lat         = feat["lat"],
+            lon         = feat["lon"],
             date_str    = feat["date_str"],
             prediction  = result["prediction"],
             probability = result["probability"],

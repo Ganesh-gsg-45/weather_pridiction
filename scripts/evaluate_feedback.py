@@ -1,22 +1,22 @@
 """
 Production Feedback Loop Evaluator.
 Reads logs/prediction_feedback.csv, fetches actual historical rain outcome
-for past predicted dates via Open-Meteo Archive API, updates the feedback log,
-and computes real-world production accuracy, precision, and recall metrics.
+for past predicted dates via Open-Meteo Archive API using exact logged coordinates,
+updates the feedback log, and computes real-world production accuracy and recall metrics.
 """
 import os
 import sys
 import pandas as pd
 import requests
-from datetime import datetime, timedelta
+from datetime import datetime
 
 # Ensure UTF-8 output
 sys.stdout.reconfigure(encoding="utf-8")
 
 LOG_FILE = os.path.join("logs", "prediction_feedback.csv")
 
-# City lat/lon mapping for actual outcome lookups
-CITY_COORDS = {
+# Known fallback coordinates for 10 training cities if older log entries lack lat/lon
+CITY_COORDS_FALLBACK = {
     "Delhi": (28.6139, 77.2090),
     "Mumbai": (19.0760, 72.8777),
     "Bangalore": (12.9716, 77.5946),
@@ -27,21 +27,14 @@ CITY_COORDS = {
     "Jaipur": (26.9124, 75.7873),
     "Lucknow": (26.8467, 80.9462),
     "Pune": (18.5204, 73.8567),
-    "Cairo": (30.0444, 31.2357),
-    "Dubai": (25.2048, 55.2708),
-    "Riyadh": (24.7136, 46.6753),
 }
 
 
-def fetch_actual_rain(city: str, date_str: str) -> float:
+def fetch_actual_rain(lat: float, lon: float, date_str: str) -> float:
     """
-    Fetch actual daily precipitation (mm) from Open-Meteo Historical Archive API.
+    Fetch actual daily precipitation (mm) from Open-Meteo Historical Archive API
+    using exact geographical coordinates.
     """
-    coords = CITY_COORDS.get(city)
-    if not coords:
-        return float("nan")
-
-    lat, lon = coords
     url = (
         f"https://archive-api.open-meteo.com/v1/archive?"
         f"latitude={lat}&longitude={lon}&start_date={date_str}&end_date={date_str}"
@@ -55,7 +48,7 @@ def fetch_actual_rain(city: str, date_str: str) -> float:
             if precip_list and precip_list[0] is not None:
                 return float(precip_list[0])
     except Exception as exc:
-        print(f"   [!] Error fetching actuals for {city} on {date_str}: {exc}")
+        print(f"   [!] Error fetching actuals for ({lat},{lon}) on {date_str}: {exc}")
     return float("nan")
 
 
@@ -89,11 +82,23 @@ def evaluate_production_feedback():
 
     for idx, row in df.iterrows():
         pdate = str(row["predict_date"]).split(" ")[0]
-        # Only evaluate dates that are strictly in the past
+        # Only evaluate dates that are strictly in the past and missing actual_rain
         if pdate < today_str and pd.isna(row["actual_rain"]):
             city = str(row["city"])
-            print(f"  Fetching actual outcome for {city} on {pdate}...")
-            actual_mm = fetch_actual_rain(city, pdate)
+            lat = row.get("lat")
+            lon = row.get("lon")
+
+            # Fallback to known city coords if lat/lon missing in legacy row
+            if pd.isna(lat) or pd.isna(lon):
+                fallback = CITY_COORDS_FALLBACK.get(city)
+                if fallback:
+                    lat, lon = fallback
+                else:
+                    print(f"  [!] Skipping {city} on {pdate}: No valid lat/lon coordinates logged.")
+                    continue
+
+            print(f"  Fetching actual outcome for {city} ({lat},{lon}) on {pdate}...")
+            actual_mm = fetch_actual_rain(float(lat), float(lon), pdate)
             
             if not pd.isna(actual_mm):
                 actual_rain = 1 if actual_mm > 0.0 else 0
@@ -131,7 +136,8 @@ def evaluate_production_feedback():
         print(f"  Production Rain Recall    : {rain_recall*100:.2f}%" if not pd.isna(rain_recall) else "  Production Rain Recall    : N/A (no actual rain days yet)")
         print()
         print("  Sample Feedback Log:")
-        print(eval_df[["timestamp", "city", "predict_date", "prediction", "probability", "actual_precip_mm", "actual_rain", "is_correct"]].to_string(index=False))
+        cols = [c for c in ["timestamp", "city", "lat", "lon", "predict_date", "prediction", "probability", "actual_precip_mm", "actual_rain", "is_correct"] if c in eval_df.columns]
+        print(eval_df[cols].to_string(index=False))
 
     print(f"\n{SEP}\n")
 
