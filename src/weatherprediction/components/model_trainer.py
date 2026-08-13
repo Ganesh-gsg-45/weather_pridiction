@@ -93,14 +93,15 @@ class ModelTrainer:
                 )
 
             # ── Pick best model ────────────────────────────────────────────
-            best_name, best_model, best_acc = get_best_model(report)
-            logger.info(f"\nBest model: [{best_name}]  test_accuracy={best_acc:.4f}")
+            best_name, best_model, best_f1 = get_best_model(report)
+            best_acc = report[best_name]["test_accuracy"]
+            logger.info(f"\nBest model: [{best_name}]  F1={best_f1:.4f} | test_accuracy={best_acc:.4f}")
 
             # ── Sanity check ───────────────────────────────────────────────
-            if best_acc < self.MIN_ACCURACY_THRESHOLD:
+            if best_f1 < self.MIN_ACCURACY_THRESHOLD:
                 raise WeatherException(
-                    f"No model exceeded the minimum accuracy threshold of "
-                    f"{self.MIN_ACCURACY_THRESHOLD:.0%}. Best was {best_acc:.4f}.",
+                    f"No model exceeded the minimum F1 threshold of "
+                    f"{self.MIN_ACCURACY_THRESHOLD:.0%}. Best was {best_f1:.4f}.",
                     sys,
                 )
 

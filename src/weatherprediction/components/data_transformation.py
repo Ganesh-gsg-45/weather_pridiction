@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import LabelEncoder, OneHotEncoder, StandardScaler
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
 from weatherprediction.exception import WeatherException
 from weatherprediction.logger import logger
@@ -22,47 +22,60 @@ class DataTransformationConfig:
 
 class DataTransformation:
     """
-    Handles all feature engineering and preprocessing steps that were
-    performed inside the notebook:
-      - Drop high-cardinality / low-signal categorical columns
-      - Parse Date → Day, Month, Year
-      - Label-encode the target (RainTomorrow)
-      - Median imputation + StandardScaler for numeric features
-      - Mode imputation + OneHotEncoder for categorical features
+    Handles all feature engineering and preprocessing steps for the
+    india_2000_2024_daily_weather dataset:
+
+      Feature engineering (done in _feature_engineer):
+        - Parse 'date'  → Day, Month, Year  (date column then dropped)
+        - rain_today    = 1 if precipitation_sum > 0 else 0  (new binary feature)
+
+      Preprocessing (done via ColumnTransformer):
+        - Numeric  : median imputation + StandardScaler
+        - Categorical ('city'): mode imputation + OneHotEncoder(drop='first')
+
+      Target:
+        - 'rain_tomorrow' is already int 0/1 from DataIngestion — no encoding needed.
     """
 
-    # ── Columns to drop before modelling (match notebook) ─────────────────────
+    # ── Columns to drop before modelling ──────────────────────────────────────
+    # 'date' is parsed into Day/Month/Year so the raw column is removed.
+    # 'rain_tomorrow' is the target, handled separately.
     COLS_TO_DROP = [
-        "Location",
-        "WindGustDir",
-        "WindDir9am",
-        "WindDir3pm",
-        "Cloud9am",
-        "Cloud3pm",
-        "Date",          # replaced by Day / Month / Year
+        "date",       # replaced by Day / Month / Year
+        "rain_sum",   # exact 1.0 correlation duplicate of precipitation_sum
     ]
 
-    TARGET_COL = "RainTomorrow"
+    TARGET_COL = "rain_tomorrow"
 
     def __init__(self):
         self.config = DataTransformationConfig()
 
     # ──────────────────────────────────────────────────────────────────────────
     def _feature_engineer(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Apply all feature-engineering steps in place."""
+        """
+        Apply all feature-engineering steps.
+
+        Steps
+        -----
+        1. Parse 'date' → Day, Month, Year (numeric temporal features).
+        2. Derive 'rain_today' from precipitation_sum (1 if > 0 else 0).
+        """
         df = df.copy()
 
-        # Parse Date → numeric components
-        if "Date" in df.columns:
-            df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
-            df["Day"]   = df["Date"].dt.day
-            df["Month"] = df["Date"].dt.month
-            df["Year"]  = df["Date"].dt.year
+        # ── 1. Parse date → temporal components ────────────────────────────
+        if "date" in df.columns:
+            df["date"] = pd.to_datetime(df["date"], errors="coerce")
+            df["Day"]   = df["date"].dt.day
+            df["Month"] = df["date"].dt.month
+            df["Year"]  = df["date"].dt.year
+            # 'date' will be dropped via COLS_TO_DROP in the caller
 
-        # Label-encode RainToday (Yes/No → 1/0)
-        if "RainToday" in df.columns:
-            le = LabelEncoder()
-            df["RainToday"] = le.fit_transform(df["RainToday"].astype(str))
+        # ── 2. rain_today: did it rain on THIS day? ─────────────────────────
+        # Uses the raw precipitation_sum before any scaling so the threshold
+        # is meaningful (> 0 mm = rain today).
+        if "precipitation_sum" in df.columns:
+            df["rain_today"] = (df["precipitation_sum"] > 0).astype(int)
+            logger.info("Derived 'rain_today' from precipitation_sum > 0")
 
         return df
 
@@ -117,20 +130,32 @@ class DataTransformation:
             logger.info(f"Loaded train {train_df.shape}, test {test_df.shape}")
 
             # ── Feature engineering ────────────────────────────────────────
+            # Adds Day/Month/Year and rain_today before anything is dropped.
             train_df = self._feature_engineer(train_df)
             test_df  = self._feature_engineer(test_df)
 
-            # ── Separate target & encode it ────────────────────────────────
-            le = LabelEncoder()
-            y_train = le.fit_transform(train_df[self.TARGET_COL].astype(str))
-            y_test  = le.transform(test_df[self.TARGET_COL].astype(str))
+            # ── Separate target ────────────────────────────────────────────
+            # rain_tomorrow is already int 0/1 from DataIngestion — no
+            # LabelEncoder needed.
+            y_train = train_df[self.TARGET_COL].values
+            y_test  = test_df[self.TARGET_COL].values
+            logger.info(
+                f"Target distribution — train: "
+                f"rain={y_train.sum():,}/{len(y_train):,} "
+                f"({y_train.mean()*100:.1f}%)  "
+                f"test: rain={y_test.sum():,}/{len(y_test):,} "
+                f"({y_test.mean()*100:.1f}%)"
+            )
 
             # ── Drop unwanted columns ──────────────────────────────────────
             cols_to_drop_existing = [
                 c for c in self.COLS_TO_DROP if c in train_df.columns
             ]
             x_train = train_df.drop(columns=cols_to_drop_existing + [self.TARGET_COL])
-            x_test  = test_df.drop(columns=[c for c in cols_to_drop_existing + [self.TARGET_COL] if c in test_df.columns])
+            x_test  = test_df.drop(
+                columns=[c for c in cols_to_drop_existing + [self.TARGET_COL]
+                         if c in test_df.columns]
+            )
 
             logger.info(f"Feature matrix shape — train: {x_train.shape}, test: {x_test.shape}")
 

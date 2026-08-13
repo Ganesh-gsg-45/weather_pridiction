@@ -19,6 +19,31 @@ OWM_GEO  = "https://api.openweathermap.org/geo/1.0"
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
+PREDICTION_FEEDBACK_LOG = os.path.join("logs", "prediction_feedback.csv")
+
+def log_prediction_feedback(city: str, date_str: str, prediction: str, probability: float, confidence: float, features: dict):
+    """
+    Log live inference predictions to CSV feedback log for continuous monitoring
+    and post-hoc evaluation against next-day actual weather outcomes.
+    """
+    try:
+        os.makedirs(os.path.dirname(PREDICTION_FEEDBACK_LOG), exist_ok=True)
+        with open(PREDICTION_FEEDBACK_LOG, mode="a", encoding="utf-8") as f:
+            if f.tell() == 0:
+                f.write("timestamp,city,predict_date,prediction,probability,confidence,temp_max,temp_min,precip_sum,weather_code\n")
+            
+            ts = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+            tmax = features.get("temperature_2m_max", "")
+            tmin = features.get("temperature_2m_min", "")
+            prec = features.get("precipitation_sum", "")
+            wcode = features.get("weather_code", "")
+            
+            f.write(f"{ts},{city},{date_str},{prediction},{probability},{confidence},{tmax},{tmin},{prec},{wcode}\n")
+            logger.info(f"Logged prediction feedback -> {city} ({date_str}): {prediction} ({probability}%)")
+    except Exception as exc:
+        logger.warning(f"Could not write prediction log: {exc}")
+
+
 def owm_get(endpoint, params: dict):
     """Call OpenWeatherMap API and return JSON or None on error."""
     params["appid"] = WEATHER_API_KEY
@@ -56,6 +81,69 @@ def aqi_label(aqi: int) -> dict:
         5: {"text": "Very Poor",   "color": "#7c3aed"},
     }
     return labels.get(aqi, {"text": "Unknown", "color": "#6b7280"})
+
+
+def owm_id_to_wmo_code(owm_id: int) -> int:
+    """
+    Map an OpenWeatherMap condition ID to the closest WMO weather code
+    used by the Open-Meteo training dataset (range 0-65).
+
+    Verified against:
+      OWM docs  : https://openweathermap.org/weather-conditions
+      WMO table : https://open-meteo.com/en/docs#weathervariables
+
+    Test cases
+    ----------
+    owm 800 (clear)       → wmo 0  (clear sky)
+    owm 801 (few clouds)  → wmo 1  (mainly clear)
+    owm 802 (scattered)   → wmo 2  (partly cloudy)
+    owm 804 (overcast)    → wmo 3  (overcast)
+    owm 741 (fog)         → wmo 45 (fog)
+    owm 300 (drizzle)     → wmo 51 (light drizzle)
+    owm 500 (light rain)  → wmo 61 (slight rain)
+    owm 501 (mod. rain)   → wmo 63 (moderate rain)
+    owm 502 (heavy rain)  → wmo 65 (heavy rain)
+    owm 200 (thunderstorm)→ wmo 65 (capped at dataset max)
+    """
+    if owm_id == 800:
+        return 0    # Clear sky
+    if owm_id == 801:
+        return 1    # Mainly clear
+    if owm_id == 802:
+        return 2    # Partly cloudy
+    if owm_id in (803, 804):
+        return 3    # Overcast
+    if 700 <= owm_id <= 799:
+        # Atmosphere: mist(701), smoke(711), haze(721), dust(731,761),
+        # fog(741), sand(751), ash(762), squall(771), tornado(781)
+        return 45   # Fog / haze
+    if 300 <= owm_id <= 321:
+        # Drizzle: light(300,301), moderate(302,311), heavy(312,314,321)
+        if owm_id in (300, 301, 310):
+            return 51   # Light drizzle
+        if owm_id in (302, 311, 313):
+            return 53   # Moderate drizzle
+        return 55       # Dense drizzle
+    if 500 <= owm_id <= 531:
+        # Rain
+        if owm_id == 500:
+            return 61   # Slight rain
+        if owm_id == 501:
+            return 63   # Moderate rain
+        if owm_id in (502, 503, 504):
+            return 65   # Heavy rain (dataset max)
+        if owm_id in (511, 520):
+            return 61   # Freezing / light shower → slight rain
+        if owm_id in (521, 522, 531):
+            return 63   # Shower rain
+        return 61
+    if 600 <= owm_id <= 622:
+        # Snow — rare for India; map to light rain equivalent
+        return 61
+    if 200 <= owm_id <= 232:
+        # Thunderstorm — cap at 65 (dataset max; WMO 95+ not in training data)
+        return 65
+    return 3  # fallback: overcast
 
 
 def compute_moon_phase(dt: datetime = None) -> dict:
@@ -339,10 +427,33 @@ def api_map_precipitation(z, x, y):
 
 
 # ── ML Feature Derivation ──────────────────────────────────────────────────────
-def derive_features_from_owm(city: str, lat: float = None, lon: float = None, target_date_str: str = None):
+def derive_features_from_owm(
+    city: str,
+    lat: float = None,
+    lon: float = None,
+    target_date_str: str = None,
+):
     """
-    Fetch OWM current & forecast weather data and derive all 18 model features.
+    Fetch OWM current & forecast data and derive all 15 model features
+    matching the india_2000_2024_daily_weather.csv schema.
+
+    Features derived
+    ----------------
+    temperature_2m_max          max daily temp (°C)
+    temperature_2m_min          min daily temp (°C)
+    apparent_temperature_max    max feels-like temp (°C)
+    apparent_temperature_min    min feels-like temp (°C)
+    precipitation_sum           total precipitation (mm)
+    weather_code                WMO code approximated from OWM condition ID
+    wind_speed_10m_max          max 10m wind speed (km/h)
+    wind_gusts_10m_max          max 10m wind gust (km/h)
+    wind_direction_10m_dominant dominant wind direction (°)
+    rain_today                  1 if precipitation_sum > 0
+    Day / Month / Year          from target_date_str
+    city                        resolved OWM city name (for OHE)
     """
+    from collections import Counter
+
     if not target_date_str:
         target_date_str = datetime.now().strftime("%Y-%m-%d")
 
@@ -357,101 +468,103 @@ def derive_features_from_owm(city: str, lat: float = None, lon: float = None, ta
     if not current:
         raise ValueError(f"Could not retrieve weather data for '{city}'.")
 
-    coord_lat = current["coord"]["lat"]
-    coord_lon = current["coord"]["lon"]
+    coord_lat     = current["coord"]["lat"]
+    coord_lon     = current["coord"]["lon"]
     resolved_city = current.get("name", city)
 
-    forecast_data = owm_get(f"{OWM_BASE}/forecast", {"lat": coord_lat, "lon": coord_lon, "units": "metric"})
+    forecast_data = owm_get(
+        f"{OWM_BASE}/forecast",
+        {"lat": coord_lat, "lon": coord_lon, "units": "metric"},
+    )
 
-    # Filter forecast slots for target_date_str
+    # ── Filter forecast slots for the target date ──────────────────────────────
     day_slots = []
     if forecast_data and "list" in forecast_data:
         for slot in forecast_data["list"]:
-            slot_date = slot["dt_txt"].split(" ")[0]
-            if slot_date == target_date_str:
+            if slot["dt_txt"].split(" ")[0] == target_date_str:
                 day_slots.append(slot)
 
-    # Fallback to current weather if target date has no forecast slots
+    # Fallback: use current-weather data if no forecast slots for that date
     if not day_slots:
         day_slots = [{
-            "main": current["main"],
-            "wind": current.get("wind", {}),
+            "main":   current["main"],
+            "wind":   current.get("wind", {}),
             "clouds": current.get("clouds", {}),
-            "rain": current.get("rain", {}),
-            "dt_txt": f"{target_date_str} 12:00:00"
+            "rain":   current.get("rain", {}),
+            "weather": current.get("weather", [{}]),
+            "dt_txt": f"{target_date_str} 12:00:00",
         }]
 
-    # Min/Max temps
-    min_temp = min(s["main"]["temp_min"] for s in day_slots)
-    max_temp = max(s["main"]["temp_max"] for s in day_slots)
+    # ── Temperature (°C) ──────────────────────────────────────────────────────
+    temperature_2m_max = round(max(s["main"]["temp_max"] for s in day_slots), 1)
+    temperature_2m_min = round(min(s["main"]["temp_min"] for s in day_slots), 1)
 
-    # 9am and 3pm slots
-    def closest_slot(target_hour):
-        return min(day_slots, key=lambda s: abs(int(s["dt_txt"].split(" ")[1].split(":")[0]) - target_hour))
+    # ── Apparent (feels-like) temperature ─────────────────────────────────────
+    feels_like_vals = [s["main"].get("feels_like", s["main"]["temp"]) for s in day_slots]
+    apparent_temperature_max = round(max(feels_like_vals), 1)
+    apparent_temperature_min = round(min(feels_like_vals), 1)
 
-    slot_9am = closest_slot(9)
-    slot_3pm = closest_slot(15)
+    # ── Precipitation (mm) ────────────────────────────────────────────────────
+    precipitation_sum = round(
+        sum(s.get("rain", {}).get("3h", 0.0) for s in day_slots), 1
+    )
+    # For India, snow is negligible — rain_sum ≈ precipitation_sum
+    rain_sum  = precipitation_sum
+    rain_today = 1 if precipitation_sum > 0.0 else 0
 
-    temp_9am = slot_9am["main"]["temp"]
-    temp_3pm = slot_3pm["main"]["temp"]
+    # ── Wind (m/s → km/h) ─────────────────────────────────────────────────────
+    wind_speed_10m_max = round(
+        max(s["wind"].get("speed", 0.0) for s in day_slots) * 3.6, 1
+    )
+    max_gust_ms = max(
+        s["wind"].get("gust", s["wind"].get("speed", 0.0) * 1.3)
+        for s in day_slots
+    )
+    wind_gusts_10m_max = round(max_gust_ms * 3.6, 1)
 
-    humidity_9am = float(slot_9am["main"]["humidity"])
-    humidity_3pm = float(slot_3pm["main"]["humidity"])
+    # ── Wind direction (dominant, degrees) ────────────────────────────────────
+    wind_degs = [s["wind"].get("deg", 0) for s in day_slots]
+    wind_direction_10m_dominant = float(
+        Counter(wind_degs).most_common(1)[0][0] if wind_degs else 0
+    )
 
-    pressure_9am = float(slot_9am["main"]["pressure"])
-    pressure_3pm = float(slot_3pm["main"]["pressure"])
-
-    # Wind (convert m/s to km/h)
-    wind_speed_9am = round(slot_9am["wind"].get("speed", 0.0) * 3.6, 1)
-    wind_speed_3pm = round(slot_3pm["wind"].get("speed", 0.0) * 3.6, 1)
-
-    max_gust_ms = max(s["wind"].get("gust", s["wind"].get("speed", 0.0) * 1.3) for s in day_slots)
-    wind_gust_speed = round(max_gust_ms * 3.6, 1)
-
-    # Rainfall (mm)
-    rainfall = sum(s.get("rain", {}).get("3h", 0.0) for s in day_slots)
-    rain_today = 1 if rainfall > 0.0 else 0
-
-    # Day length (hours)
-    sunrise_ts = current.get("sys", {}).get("sunrise", 0)
-    sunset_ts = current.get("sys", {}).get("sunset", 0)
-    if sunset_ts > sunrise_ts:
-        day_length_hours = (sunset_ts - sunrise_ts) / 3600.0
+    # ── WMO weather code ──────────────────────────────────────────────────────
+    # Use the most severe (highest OWM ID category) condition across the day.
+    owm_ids = []
+    for s in day_slots:
+        weather_list = s.get("weather", [])
+        if weather_list:
+            owm_ids.append(weather_list[0].get("id", 800))
+    # Pick the ID that maps to the highest WMO code (most severe)
+    if owm_ids:
+        weather_code = max(owm_id_to_wmo_code(wid) for wid in owm_ids)
     else:
-        day_length_hours = 12.0
+        weather_code = owm_id_to_wmo_code(current["weather"][0]["id"])
 
-    # Sunshine (hours) estimated from cloud cover
-    avg_clouds = sum(s.get("clouds", {}).get("all", 50) for s in day_slots) / float(len(day_slots))
-    sunshine = round(max(0.0, day_length_hours * (1.0 - (avg_clouds / 100.0))), 1)
-
-    # Evaporation (mm) estimated with Hargreaves equation
-    mean_temp = (max_temp + min_temp) / 2.0
-    temp_range = max(0.1, max_temp - min_temp)
-    evap_estimate = 0.0023 * (mean_temp + 17.8) * math.sqrt(temp_range) * (day_length_hours / 12.0)
-    evaporation = round(max(0.0, evap_estimate), 1)
+    logger.info(
+        f"OWM IDs for {target_date_str}: {owm_ids}  →  WMO weather_code={weather_code}"
+    )
 
     return {
-        "min_temp": round(min_temp, 1),
-        "max_temp": round(max_temp, 1),
-        "rainfall": round(rainfall, 1),
-        "evaporation": evaporation,
-        "sunshine": sunshine,
-        "wind_gust_speed": wind_gust_speed,
-        "wind_speed_9am": wind_speed_9am,
-        "wind_speed_3pm": wind_speed_3pm,
-        "humidity_9am": humidity_9am,
-        "humidity_3pm": humidity_3pm,
-        "pressure_9am": pressure_9am,
-        "pressure_3pm": pressure_3pm,
-        "temp_9am": round(temp_9am, 1),
-        "temp_3pm": round(temp_3pm, 1),
-        "rain_today": rain_today,
-        "day": target_dt.day,
-        "month": target_dt.month,
-        "year": target_dt.year,
+        # ── Model features ──────────────────────────────────────────────────
+        "temperature_2m_max":          temperature_2m_max,
+        "temperature_2m_min":          temperature_2m_min,
+        "apparent_temperature_max":    apparent_temperature_max,
+        "apparent_temperature_min":    apparent_temperature_min,
+        "precipitation_sum":           precipitation_sum,
+        "weather_code":                weather_code,
+        "wind_speed_10m_max":          wind_speed_10m_max,
+        "wind_gusts_10m_max":          wind_gusts_10m_max,
+        "wind_direction_10m_dominant": wind_direction_10m_dominant,
+        "rain_today":                  rain_today,
+        "day":                         target_dt.day,
+        "month":                       target_dt.month,
+        "year":                        target_dt.year,
+        "city":                        resolved_city,
+        # ── Display-only ─────────────────────────────────────────────────────
         "resolved_city": resolved_city,
-        "country": current.get("sys", {}).get("country", ""),
-        "date_str": target_date_str,
+        "country":       current.get("sys", {}).get("country", ""),
+        "date_str":      target_date_str,
     }
 
 
@@ -466,32 +579,28 @@ def predict_form():
 def predict():
     try:
         form = request.form
-        city = form.get("city", "London").strip()
-        lat = float(form["lat"]) if form.get("lat") else None
-        lon = float(form["lon"]) if form.get("lon") else None
+        city = form.get("city", "Delhi").strip() or "Delhi"
+        lat = float(form["lat"]) if form.get("lat") and form["lat"].replace(".","").replace("-","").isdigit() else None
+        lon = float(form["lon"]) if form.get("lon") and form["lon"].replace(".","").replace("-","").isdigit() else None
         target_date = form.get("date", datetime.now().strftime("%Y-%m-%d"))
 
         feat = derive_features_from_owm(city, lat, lon, target_date)
 
         data = CustomData(
-            min_temp        = feat["min_temp"],
-            max_temp        = feat["max_temp"],
-            rainfall        = feat["rainfall"],
-            evaporation     = feat["evaporation"],
-            sunshine        = feat["sunshine"],
-            wind_gust_speed = feat["wind_gust_speed"],
-            wind_speed_9am  = feat["wind_speed_9am"],
-            wind_speed_3pm  = feat["wind_speed_3pm"],
-            humidity_9am    = feat["humidity_9am"],
-            humidity_3pm    = feat["humidity_3pm"],
-            pressure_9am    = feat["pressure_9am"],
-            pressure_3pm    = feat["pressure_3pm"],
-            temp_9am        = feat["temp_9am"],
-            temp_3pm        = feat["temp_3pm"],
-            rain_today      = feat["rain_today"],
-            day             = feat["day"],
-            month           = feat["month"],
-            year            = feat["year"],
+            temperature_2m_max          = feat["temperature_2m_max"],
+            temperature_2m_min          = feat["temperature_2m_min"],
+            apparent_temperature_max    = feat["apparent_temperature_max"],
+            apparent_temperature_min    = feat["apparent_temperature_min"],
+            precipitation_sum           = feat["precipitation_sum"],
+            weather_code                = feat["weather_code"],
+            wind_speed_10m_max          = feat["wind_speed_10m_max"],
+            wind_gusts_10m_max          = feat["wind_gusts_10m_max"],
+            wind_direction_10m_dominant = feat["wind_direction_10m_dominant"],
+            rain_today                  = feat["rain_today"],
+            day                         = feat["day"],
+            month                       = feat["month"],
+            year                        = feat["year"],
+            city                        = feat["city"],
         )
 
         df = data.get_data_as_dataframe()
@@ -500,6 +609,16 @@ def predict():
         pipeline = PredictPipeline()
         adv = pipeline.predict_advanced(df)
         result = adv[0]
+
+        # Log prediction to feedback tracker for production monitoring
+        log_prediction_feedback(
+            city        = feat["resolved_city"],
+            date_str    = feat["date_str"],
+            prediction  = result["prediction"],
+            probability = result["probability"],
+            confidence  = result["confidence"],
+            features    = feat,
+        )
 
         return render_template(
             "result.html",
@@ -539,24 +658,20 @@ def predict_multi():
             try:
                 feat = derive_features_from_owm(city, lat, lon, target_date)
                 data = CustomData(
-                    min_temp        = feat["min_temp"],
-                    max_temp        = feat["max_temp"],
-                    rainfall        = feat["rainfall"],
-                    evaporation     = feat["evaporation"],
-                    sunshine        = feat["sunshine"],
-                    wind_gust_speed = feat["wind_gust_speed"],
-                    wind_speed_9am  = feat["wind_speed_9am"],
-                    wind_speed_3pm  = feat["wind_speed_3pm"],
-                    humidity_9am    = feat["humidity_9am"],
-                    humidity_3pm    = feat["humidity_3pm"],
-                    pressure_9am    = feat["pressure_9am"],
-                    pressure_3pm    = feat["pressure_3pm"],
-                    temp_9am        = feat["temp_9am"],
-                    temp_3pm        = feat["temp_3pm"],
-                    rain_today      = feat["rain_today"],
-                    day             = feat["day"],
-                    month           = feat["month"],
-                    year            = feat["year"],
+                    temperature_2m_max          = feat["temperature_2m_max"],
+                    temperature_2m_min          = feat["temperature_2m_min"],
+                    apparent_temperature_max    = feat["apparent_temperature_max"],
+                    apparent_temperature_min    = feat["apparent_temperature_min"],
+                    precipitation_sum           = feat["precipitation_sum"],
+                    weather_code                = feat["weather_code"],
+                    wind_speed_10m_max          = feat["wind_speed_10m_max"],
+                    wind_gusts_10m_max          = feat["wind_gusts_10m_max"],
+                    wind_direction_10m_dominant = feat["wind_direction_10m_dominant"],
+                    rain_today                  = feat["rain_today"],
+                    day                         = feat["day"],
+                    month                       = feat["month"],
+                    year                        = feat["year"],
+                    city                        = feat["city"],
                 )
                 df = data.get_data_as_dataframe()
                 adv = pipeline.predict_advanced(df)
@@ -589,11 +704,13 @@ def predict_multi():
 
 
 if __name__ == "__main__":
-    port = 5000
+    port = int(os.getenv("PORT", 5000))
+    debug_mode = os.getenv("FLASK_DEBUG", "false").lower() == "true"
     print("\n" + "="*50)
     print("  Weather Prediction App is starting...")
     print(f"  >> Local:   http://127.0.0.1:{port}")
     print(f"  >> Network: http://0.0.0.0:{port}")
+    print(f"  >> Debug:   {debug_mode}")
     print("="*50 + "\n")
-    app.run(host="0.0.0.0", port=port, debug=True)
+    app.run(host="0.0.0.0", port=port, debug=debug_mode)
 

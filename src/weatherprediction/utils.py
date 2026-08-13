@@ -3,7 +3,14 @@ import sys
 import dill
 import numpy as np
 import pandas as pd
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+from sklearn.metrics import (
+    accuracy_score,
+    f1_score,
+    precision_score,
+    recall_score,
+    roc_auc_score,
+    classification_report,
+)
 
 from weatherprediction.exception import WeatherException
 from weatherprediction.logger import logger
@@ -43,7 +50,19 @@ def evaluate_models(
 ) -> dict:
     """
     Train each model, evaluate on train + test sets, and return a
-    report dict: {model_name: {"model": obj, "test_accuracy": float, ...}}
+    report dict keyed by model name.
+
+    Metrics computed per model
+    --------------------------
+    train_accuracy   : accuracy on training set (watch for overfitting)
+    test_accuracy    : overall accuracy on test set
+    precision        : precision for class 1 (rain)
+    recall           : recall for class 1 (rain)  — same as rain_recall
+    rain_recall      : alias of recall; highlighted separately so it's
+                       impossible to miss when comparing models
+    f1_score         : harmonic mean of precision & recall
+    roc_auc          : area under ROC curve (requires predict_proba;
+                       falls back to 0.5 for models that lack it)
     """
     try:
         report = {}
@@ -53,18 +72,28 @@ def evaluate_models(
             model.fit(x_train, y_train)
 
             y_train_pred = model.predict(x_train)
-            y_test_pred = model.predict(x_test)
+            y_test_pred  = model.predict(x_test)
 
-            train_acc = accuracy_score(y_train, y_train_pred)
-            test_acc  = accuracy_score(y_test,  y_test_pred)
-            test_prec = precision_score(y_test, y_test_pred, zero_division=0)
-            test_rec  = recall_score(y_test,    y_test_pred, zero_division=0)
-            test_f1   = f1_score(y_test,        y_test_pred, zero_division=0)
+            train_acc  = accuracy_score(y_train, y_train_pred)
+            test_acc   = accuracy_score(y_test,  y_test_pred)
+            test_prec  = precision_score(y_test,  y_test_pred, zero_division=0)
+            test_rec   = recall_score(y_test,    y_test_pred, zero_division=0)
+            test_f1    = f1_score(y_test,        y_test_pred, zero_division=0)
+
+            # ── ROC-AUC (requires predict_proba) ──────────────────────────────
+            try:
+                y_proba  = model.predict_proba(x_test)[:, 1]
+                test_auc = roc_auc_score(y_test, y_proba)
+            except AttributeError:
+                # Model doesn't support predict_proba (e.g. LinearSVC)
+                test_auc = 0.5
+                logger.warning(f"{name}: no predict_proba — ROC-AUC set to 0.5")
 
             logger.info(
-                f"{name} → train_acc={train_acc:.4f} | "
-                f"test_acc={test_acc:.4f} | precision={test_prec:.4f} | "
-                f"recall={test_rec:.4f} | f1={test_f1:.4f}"
+                f"{name} → "
+                f"train_acc={train_acc:.4f} | test_acc={test_acc:.4f} | "
+                f"prec={test_prec:.4f} | recall={test_rec:.4f} | "
+                f"f1={test_f1:.4f} | roc_auc={test_auc:.4f}"
             )
 
             report[name] = {
@@ -73,7 +102,9 @@ def evaluate_models(
                 "test_accuracy":  test_acc,
                 "precision":      test_prec,
                 "recall":         test_rec,
+                "rain_recall":    test_rec,   # alias — rain-day catch rate
                 "f1_score":       test_f1,
+                "roc_auc":        test_auc,
             }
 
         return report
@@ -84,9 +115,13 @@ def evaluate_models(
 
 def get_best_model(report: dict) -> tuple[str, object, float]:
     """
-    Return (best_model_name, best_model_object, best_test_accuracy)
-    from the evaluation report.
+    Return (best_model_name, best_model_object, best_f1_score).
+
+    Ranking key: F1 score (not raw accuracy).
+    F1 balances precision and recall, making it robust to mild class
+    imbalance and ensuring the model actually catches rain days rather
+    than coasting on majority-class predictions.
     """
-    best_name = max(report, key=lambda k: report[k]["test_accuracy"])
+    best_name = max(report, key=lambda k: report[k]["f1_score"])
     best_info = report[best_name]
-    return best_name, best_info["model"], best_info["test_accuracy"]
+    return best_name, best_info["model"], best_info["f1_score"]

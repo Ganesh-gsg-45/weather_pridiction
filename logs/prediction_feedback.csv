@@ -1,0 +1,2 @@
+timestamp,city,predict_date,prediction,probability,confidence,temp_max,temp_min,precip_sum,weather_code
+2026-08-13T13:18:07Z,Mumbai,2026-08-14,Yes,95.0,100.0,28.0,25.9,3.9,61

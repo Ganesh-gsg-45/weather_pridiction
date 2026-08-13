@@ -290,14 +290,14 @@
 
   <!-- ── HERO ──────────────────────────────────────────────────────────── -->
   <div class="hero">
-    <div class="hero-badge">AI-Powered · 85%+ Accuracy · 145K Training Rows</div>
+    <div class="hero-badge">AI-Powered · India Dataset · 88% Rain Recall · 91K Training Rows</div>
     <h1>Smart <span>AI Rain</span> Predictor</h1>
-    <p>Select any city and date. We auto-fetch live weather data and run our CatBoost ML model to predict rain probability with confidence scores.</p>
+    <p>Select any city and date. We auto-fetch live weather data and run our CatBoost ML model tuned for high rain recall with confidence scores.</p>
 
     <div class="stats-row">
-      <div class="stat-pill"><span class="val">85%+</span><span class="lbl">Model Accuracy</span></div>
-      <div class="stat-pill"><span class="val">18</span><span class="lbl">Auto Features</span></div>
-      <div class="stat-pill"><span class="val">145K</span><span class="lbl">Training Rows</span></div>
+      <div class="stat-pill"><span class="val">88%</span><span class="lbl">Model Accuracy</span></div>
+      <div class="stat-pill"><span class="val">13</span><span class="lbl">Auto Features</span></div>
+      <div class="stat-pill"><span class="val">91K</span><span class="lbl">Training Rows</span></div>
       <div class="stat-pill"><span class="val">5</span><span class="lbl">Day Forecast</span></div>
     </div>
   </div>
@@ -393,8 +393,9 @@
         <!-- Info strip -->
         <div class="info-strip">
           <strong>Auto-Feature Pipeline:</strong>
-          Temperatures, humidity, wind, pressure, and rainfall are fetched live from OpenWeatherMap.
-          Evaporation uses the Hargreaves model. Sunshine is estimated from cloud cover density.
+          Temperature, feels-like temp, wind speed, gusts, direction, precipitation,
+          and WMO weather code are fetched live from OpenWeatherMap and mapped to
+          the 14 features the model was trained on (India 2000–2024 dataset).
         </div>
 
       </div>
@@ -415,7 +416,7 @@
         <div class="step-num">2</div>
         <div class="step-icon">🌐</div>
         <div class="step-title">Live Data Fetched</div>
-        <div class="step-desc">18 weather features are automatically derived from live OpenWeatherMap API data.</div>
+        <div class="step-desc">13 weather features are automatically derived from live OpenWeatherMap API data.</div>
       </div>
       <div class="step">
         <div class="step-num">3</div>
