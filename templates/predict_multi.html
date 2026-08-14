@@ -323,9 +323,9 @@
           <!-- Quick Stats -->
           {% if day.features %}
           <div class="day-quick">
-            <div class="dq-item">🌡️ <strong>{{ day.features.min_temp }}° / {{ day.features.max_temp }}°C</strong></div>
-            <div class="dq-item">💧 <strong>{{ day.features.humidity_3pm }}%</strong> humidity</div>
-            <div class="dq-item">💨 <strong>{{ day.features.wind_gust_speed }} km/h</strong> gust</div>
+            <div class="dq-item">🌡️ <strong>{{ day.features.temperature_2m_min }}° / {{ day.features.temperature_2m_max }}°C</strong></div>
+            <div class="dq-item">🌧️ <strong>{{ day.features.precipitation_sum }} mm</strong> precip</div>
+            <div class="dq-item">💨 <strong>{{ day.features.wind_gusts_10m_max }} km/h</strong> gust</div>
           </div>
           {% endif %}
 
@@ -346,38 +346,43 @@
             <div class="detail-grid">
               <div class="detail-stat">
                 <div class="detail-icon">🌡️</div>
-                <div class="detail-val">{{ day.features.min_temp }}° / {{ day.features.max_temp }}°C</div>
+                <div class="detail-val">{{ day.features.temperature_2m_min }}° / {{ day.features.temperature_2m_max }}°C</div>
                 <div class="detail-lbl">Min / Max Temp</div>
               </div>
               <div class="detail-stat">
                 <div class="detail-icon">🌡️</div>
-                <div class="detail-val">{{ day.features.temp_9am }}° / {{ day.features.temp_3pm }}°C</div>
-                <div class="detail-lbl">Temp 9am / 3pm</div>
-              </div>
-              <div class="detail-stat">
-                <div class="detail-icon">💧</div>
-                <div class="detail-val">{{ day.features.humidity_9am }}% / {{ day.features.humidity_3pm }}%</div>
-                <div class="detail-lbl">Humidity 9am / 3pm</div>
-              </div>
-              <div class="detail-stat">
-                <div class="detail-icon">🔵</div>
-                <div class="detail-val">{{ day.features.pressure_9am }} / {{ day.features.pressure_3pm }}</div>
-                <div class="detail-lbl">Pressure hPa 9am / 3pm</div>
-              </div>
-              <div class="detail-stat">
-                <div class="detail-icon">💨</div>
-                <div class="detail-val">{{ day.features.wind_gust_speed }} km/h</div>
-                <div class="detail-lbl">Wind Gust Speed</div>
+                <div class="detail-val">{{ day.features.apparent_temperature_min }}° / {{ day.features.apparent_temperature_max }}°C</div>
+                <div class="detail-lbl">Feels-Like Min/Max</div>
               </div>
               <div class="detail-stat">
                 <div class="detail-icon">🌧️</div>
-                <div class="detail-val">{{ day.features.rainfall }} mm</div>
-                <div class="detail-lbl">Rainfall</div>
+                <div class="detail-val">{{ day.features.precipitation_sum }} mm</div>
+                <div class="detail-lbl">Precipitation</div>
               </div>
               <div class="detail-stat">
-                <div class="detail-icon">☀️</div>
-                <div class="detail-val">{{ day.features.sunshine }} hrs</div>
-                <div class="detail-lbl">Sunshine (est.)</div>
+                <div class="detail-icon">☁️</div>
+                <div class="detail-val">{{ day.features.weather_code }}</div>
+                <div class="detail-lbl">Weather Code</div>
+              </div>
+              <div class="detail-stat">
+                <div class="detail-icon">💨</div>
+                <div class="detail-val">{{ day.features.wind_speed_10m_max }} km/h</div>
+                <div class="detail-lbl">Wind Speed Max</div>
+              </div>
+              <div class="detail-stat">
+                <div class="detail-icon">🌬️</div>
+                <div class="detail-val">{{ day.features.wind_gusts_10m_max }} km/h</div>
+                <div class="detail-lbl">Wind Gust Max</div>
+              </div>
+              <div class="detail-stat">
+                <div class="detail-icon">🧭</div>
+                <div class="detail-val">{{ day.features.wind_direction_10m_dominant }}°</div>
+                <div class="detail-lbl">Wind Direction</div>
+              </div>
+              <div class="detail-stat">
+                <div class="detail-icon">{% if day.features.rain_today %}🌧️{% else %}☀️{% endif %}</div>
+                <div class="detail-val">{% if day.features.rain_today %}Yes{% else %}No{% endif %}</div>
+                <div class="detail-lbl">Rain Today</div>
               </div>
               <div class="detail-stat">
                 <div class="detail-icon">💡</div>

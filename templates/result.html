@@ -404,9 +404,9 @@
         <div class="metric-lbl">Min / Max Temp (°C)</div>
       </div>
       <div class="metric-card">
-        <div class="metric-icon">💧</div>
-        <div class="metric-val">{{ features.humidity_9am }}% / {{ features.humidity_3pm }}%</div>
-        <div class="metric-lbl">Humidity (9am / 3pm)</div>
+        <div class="metric-icon">🌡️</div>
+        <div class="metric-val">{{ features.apparent_temperature_max }}° / {{ features.apparent_temperature_min }}°</div>
+        <div class="metric-lbl">Feels-Like Max/Min (°C)</div>
       </div>
       <div class="metric-card">
         <div class="metric-icon">💨</div>
@@ -464,9 +464,9 @@
       <div class="importance-list">
         <div class="imp-item">
           <div class="imp-rank">1</div>
-          <div class="imp-label">💧 Humidity at 3pm</div>
-          <div class="imp-bar-track"><div class="imp-bar-fill" style="width:{{ [features.humidity_3pm, 100]|min }}%;"></div></div>
-          <div class="imp-value">{{ features.humidity_3pm }}%</div>
+          <div class="imp-label">🌧️ Precipitation Sum</div>
+          <div class="imp-bar-track"><div class="imp-bar-fill" style="width:{{ [(features.precipitation_sum * 10), 100]|min }}%;"></div></div>
+          <div class="imp-value">{{ features.precipitation_sum }} mm</div>
         </div>
         <div class="imp-item">
           <div class="imp-rank">2</div>
@@ -482,9 +482,9 @@
         </div>
         <div class="imp-item">
           <div class="imp-rank">4</div>
-          <div class="imp-label">🔵 Pressure at 3pm</div>
-          <div class="imp-bar-track"><div class="imp-bar-fill" style="width:{{ [((features.pressure_3pm - 980) / 40 * 100), 100]|min }}%;"></div></div>
-          <div class="imp-value">{{ features.pressure_3pm }} hPa</div>
+          <div class="imp-label">🌡️ Apparent Temp Max</div>
+          <div class="imp-bar-track"><div class="imp-bar-fill" style="width:{{ [(features.apparent_temperature_max / 50 * 100), 100]|min }}%;"></div></div>
+          <div class="imp-value">{{ features.apparent_temperature_max }}°C</div>
         </div>
         <div class="imp-item">
           <div class="imp-rank">5</div>
@@ -500,37 +500,96 @@
       <div class="section-title">📈 Weather Trend Charts</div>
       <div class="charts-grid">
         <div class="chart-box">
-          <div class="chart-title">Humidity Trend (9am → 3pm)</div>
-          <canvas class="chart-canvas" id="humidityChart"></canvas>
+          <div class="chart-title">Temperature Max/Min (°C)</div>
+          <canvas class="chart-canvas" id="tempChart"></canvas>
         </div>
         <div class="chart-box">
-          <div class="chart-title">Pressure Trend (9am → 3pm)</div>
-          <canvas class="chart-canvas" id="pressureChart"></canvas>
+          <div class="chart-title">Wind Speed/Gust (km/h)</div>
+          <canvas class="chart-canvas" id="windChart"></canvas>
         </div>
       </div>
     </div>
+    {% endif %}
 
+    <!-- ── ACTION BUTTONS ─────────────────────────────────────────────── -->
+    <div class="action-row">
+      <a href="/predict-form" class="btn-primary">Run Another Prediction</a>
+      <a href="/predict-form?multi=1" class="btn-secondary">5-Day AI Timeline</a>
+      <a href="/weather?city={{ city }}" class="btn-ghost">View Live Weather</a>
+    </div>
+
+  </div><!-- /page -->
+
+  <script>
+    // ── Temperature Max/Min Chart ────────────────────────────────────────────────────
+    const tempCtx = document.getElementById('tempChart').getContext('2d');
+    new Chart(tempCtx, {
+      type: 'bar',
+      data: {
+        labels: ['Max Temp', 'Min Temp'],
+        datasets: [{
+          label: 'Temperature (°C)',
+          data: [{{ features.temperature_2m_max }}, {{ features.temperature_2m_min }}],
+          backgroundColor: ['#f59e0b', '#60a5fa'],
+          borderColor: ['#f59e0b', '#60a5fa'],
+          borderWidth: 1
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: 'rgba(240,244,248,0.5)', font: { size: 11 } } },
+          y: {
+            grid: { color: 'rgba(255,255,255,0.05)' },
+            ticks: { color: 'rgba(240,244,248,0.5)', font: { size: 11 } },
+            beginAtZero: true
+          }
+        }
+      }
+    });
+
+    // ── Wind Speed/Gust Chart ────────────────────────────────────────────────────
+    const windCtx = document.getElementById('windChart').getContext('2d');
+    new Chart(windCtx, {
+      type: 'bar',
+      data: {
+        labels: ['Max Wind Speed', 'Max Wind Gust'],
+        datasets: [{
+          label: 'Speed (km/h)',
+          data: [{{ features.wind_speed_10m_max }}, {{ features.wind_gusts_10m_max }}],
+          backgroundColor: ['#06b6d4', '#d97706'],
+          borderColor: ['#06b6d4', '#d97706'],
+          borderWidth: 1
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: 'rgba(240,244,248,0.5)', font: { size: 11 } } },
+          y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: 'rgba(240,244,248,0.5)', font: { size: 11 } }, beginAtZero: true }
+        }
+      }
+    });
+  </script>
     <!-- ── 18 FEATURE CARDS ───────────────────────────────────────────── -->
     <div class="section-card">
       <div class="section-title">⚙️ All Auto-Derived Model Features (18)</div>
       <div class="features-grid">
-        <div class="feat-card"><div class="feat-icon">🌡️</div><div class="feat-val">{{ features.min_temp }}°C</div><div class="feat-lbl">Min Temp</div></div>
-        <div class="feat-card"><div class="feat-icon">🌡️</div><div class="feat-val">{{ features.max_temp }}°C</div><div class="feat-lbl">Max Temp</div></div>
-        <div class="feat-card"><div class="feat-icon">🌧️</div><div class="feat-val">{{ features.rainfall }} mm</div><div class="feat-lbl">Rainfall</div></div>
-        <div class="feat-card"><div class="feat-icon">💦</div><div class="feat-val">{{ features.evaporation }} mm</div><div class="feat-lbl">Evaporation</div></div>
-        <div class="feat-card"><div class="feat-icon">☀️</div><div class="feat-val">{{ features.sunshine }} hrs</div><div class="feat-lbl">Sunshine (est.)</div></div>
-        <div class="feat-card"><div class="feat-icon">💨</div><div class="feat-val">{{ features.wind_gust_speed }}</div><div class="feat-lbl">Wind Gust (km/h)</div></div>
-        <div class="feat-card"><div class="feat-icon">🌬️</div><div class="feat-val">{{ features.wind_speed_9am }}</div><div class="feat-lbl">Wind Speed 9am</div></div>
-        <div class="feat-card"><div class="feat-icon">🌬️</div><div class="feat-val">{{ features.wind_speed_3pm }}</div><div class="feat-lbl">Wind Speed 3pm</div></div>
-        <div class="feat-card"><div class="feat-icon">💧</div><div class="feat-val">{{ features.humidity_9am }}%</div><div class="feat-lbl">Humidity 9am</div></div>
-        <div class="feat-card"><div class="feat-icon">💧</div><div class="feat-val">{{ features.humidity_3pm }}%</div><div class="feat-lbl">Humidity 3pm</div></div>
-        <div class="feat-card"><div class="feat-icon">🔵</div><div class="feat-val">{{ features.pressure_9am }}</div><div class="feat-lbl">Pressure 9am (hPa)</div></div>
-        <div class="feat-card"><div class="feat-icon">🔵</div><div class="feat-val">{{ features.pressure_3pm }}</div><div class="feat-lbl">Pressure 3pm (hPa)</div></div>
-        <div class="feat-card"><div class="feat-icon">🌡️</div><div class="feat-val">{{ features.temp_9am }}°C</div><div class="feat-lbl">Temp 9am</div></div>
-        <div class="feat-card"><div class="feat-icon">🌡️</div><div class="feat-val">{{ features.temp_3pm }}°C</div><div class="feat-lbl">Temp 3pm</div></div>
+        <div class="feat-card"><div class="feat-icon">🌡️</div><div class="feat-val">{{ features.temperature_2m_min }}°C</div><div class="feat-lbl">Min Temp</div></div>
+        <div class="feat-card"><div class="feat-icon">🌡️</div><div class="feat-val">{{ features.temperature_2m_max }}°C</div><div class="feat-lbl">Max Temp</div></div>
+        <div class="feat-card"><div class="feat-icon">🌡️</div><div class="feat-val">{{ features.apparent_temperature_min }}°C</div><div class="feat-lbl">Feels-Like Min</div></div>
+        <div class="feat-card"><div class="feat-icon">🌡️</div><div class="feat-val">{{ features.apparent_temperature_max }}°C</div><div class="feat-lbl">Feels-Like Max</div></div>
+        <div class="feat-card"><div class="feat-icon">🌧️</div><div class="feat-val">{{ features.precipitation_sum }} mm</div><div class="feat-lbl">Precipitation</div></div>
+        <div class="feat-card"><div class="feat-icon">☁️</div><div class="feat-val">{{ features.weather_code }}</div><div class="feat-lbl">Weather Code</div></div>
+        <div class="feat-card"><div class="feat-icon">💨</div><div class="feat-val">{{ features.wind_speed_10m_max }} km/h</div><div class="feat-lbl">Max Wind Speed</div></div>
+        <div class="feat-card"><div class="feat-icon">🌬️</div><div class="feat-val">{{ features.wind_gusts_10m_max }} km/h</div><div class="feat-lbl">Max Wind Gust</div></div>
+        <div class="feat-card"><div class="feat-icon">🧭</div><div class="feat-val">{{ features.wind_direction_10m_dominant }}°</div><div class="feat-lbl">Wind Direction</div></div>
         <div class="feat-card"><div class="feat-icon">{% if features.rain_today %}🌧️{% else %}☀️{% endif %}</div><div class="feat-val">{% if features.rain_today %}Yes{% else %}No{% endif %}</div><div class="feat-lbl">Rain Today</div></div>
-        <div class="feat-card"><div class="feat-icon">📅</div><div class="feat-val">{{ features.day }}/{{ features.month }}</div><div class="feat-lbl">Date (Day/Month)</div></div>
-        <div class="feat-card"><div class="feat-icon">📆</div><div class="feat-val">{{ features.year }}</div><div class="feat-lbl">Year</div></div>
+        <div class="feat-card"><div class="feat-icon">📅</div><div class="feat-val">{{ features.day }}</div><div class="feat-lbl">Day</div></div>
+        <div class="feat-card"><div class="feat-icon">📆</div><div class="feat-val">{{ features.month }}</div><div class="feat-lbl">Month</div></div>
+        <div class="feat-card"><div class="feat-icon">🗓️</div><div class="feat-val">{{ features.year }}</div><div class="feat-lbl">Year</div></div>
         <div class="feat-card"><div class="feat-icon">📍</div><div class="feat-val">{{ features.resolved_city }}</div><div class="feat-lbl">Resolved Location</div></div>
       </div>
 

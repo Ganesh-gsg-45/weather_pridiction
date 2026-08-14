@@ -1,7 +1,7 @@
 import sys
 import os
 import math
-from datetime import datetime, date, timedelta
+from datetime import datetime, UTC, date, timedelta
 import requests
 from flask import Flask, request, render_template, jsonify, Response
 from dotenv import load_dotenv
@@ -32,7 +32,7 @@ def log_prediction_feedback(city: str, lat: float, lon: float, date_str: str, pr
             if f.tell() == 0:
                 f.write("timestamp,city,lat,lon,predict_date,prediction,probability,confidence,temp_max,temp_min,precip_sum,weather_code\n")
             
-            ts = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+            ts = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
             tmax = features.get("temperature_2m_max", "")
             tmin = features.get("temperature_2m_min", "")
             prec = features.get("precipitation_sum", "")
@@ -153,7 +153,7 @@ def compute_moon_phase(dt: datetime = None) -> dict:
     No external API needed.
     """
     if dt is None:
-        dt = datetime.utcnow()
+        dt = datetime.now(UTC)
 
     # Known new moon reference: Jan 6, 2000
     known_new_moon = datetime(2000, 1, 6, 18, 14)
@@ -250,7 +250,7 @@ def weather_dashboard():
     # Last updated timestamp (local time of the city)
     from datetime import timezone as tz
     import datetime as dt_module
-    utc_now = dt_module.datetime.utcnow()
+    utc_now = dt_module.datetime.now(dt_module.UTC)
     city_offset = dt_module.timedelta(seconds=timezone)
     city_now = utc_now + city_offset
     last_updated = city_now.strftime("%H:%M, %a %d %b")
@@ -551,6 +551,7 @@ def derive_features_from_owm(
         "temperature_2m_min":          temperature_2m_min,
         "apparent_temperature_max":    apparent_temperature_max,
         "apparent_temperature_min":    apparent_temperature_min,
+        "humidity_3pm":                current["main"]["humidity"],
         "precipitation_sum":           precipitation_sum,
         "weather_code":                weather_code,
         "wind_speed_10m_max":          wind_speed_10m_max,
