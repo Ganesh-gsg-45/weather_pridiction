@@ -112,6 +112,74 @@ function initGeolocation() {
   });
 }
 
+// ── Auto Geolocation on Homepage Load ───────────────────────────────────────
+/**
+ * Automatically detects user location on homepage load and redirects to
+ * /weather?lat=X&lon=Y — same target the manual #geo-btn uses.
+ *
+ * Guards:
+ *  1. Only runs on the homepage (no URL query params present).
+ *  2. Uses Permissions API to skip prompting if already denied.
+ *  3. Shows a glassmorphism loading toast while waiting; hides it on failure.
+ *  4. Never shows alert() — silent fallback to the normal homepage.
+ */
+async function initAutoGeolocation() {
+  // Guard 1: only run on the bare homepage — skip if URL has any query params
+  // (city=, lat=, lon= etc. mean the user came from a link/bookmark, not fresh load)
+  if (window.location.search) {
+    console.log('[AutoGeo] Skipping — URL has query params:', window.location.search);
+    return;
+  }
+
+  // Guard 2: geolocation API must be available
+  if (!navigator.geolocation) {
+    console.log('[AutoGeo] Skipping — navigator.geolocation not available.');
+    return;
+  }
+
+  const toast = document.getElementById('geo-loading-toast');
+
+  // Guard 3: check existing permission state via Permissions API (Chrome/Edge/FF)
+  if (navigator.permissions) {
+    try {
+      const status = await navigator.permissions.query({ name: 'geolocation' });
+      console.log('[AutoGeo] Permission state:', status.state);
+
+      if (status.state === 'denied') {
+        // User already denied — never re-prompt, stay on homepage silently
+        console.log('[AutoGeo] Permission denied — showing normal homepage.');
+        return;
+      }
+      // 'granted' or 'prompt' — proceed below
+    } catch (e) {
+      // Permissions API not supported (Safari < 16) — fall through and try anyway
+      console.log('[AutoGeo] Permissions API unavailable, proceeding directly.', e);
+    }
+  }
+
+  // Show loading toast
+  if (toast) {
+    toast.style.display = 'flex';
+    console.log('[AutoGeo] Showing loading toast.');
+  }
+
+  // Request position — reuses exact same redirect logic as the manual button
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      const { latitude: lat, longitude: lon } = pos.coords;
+      const url = `/weather?lat=${lat}&lon=${lon}`;
+      console.log('[AutoGeo] Success — redirecting to:', url);
+      window.location.href = url;
+    },
+    (err) => {
+      // Denied, dismissed, or timed out — hide toast, show normal homepage silently
+      console.log('[AutoGeo] Failed (code', err.code, '):', err.message, '— staying on homepage.');
+      if (toast) toast.style.display = 'none';
+    },
+    { timeout: 10000, maximumAge: 60000 }
+  );
+}
+
 // ── Dynamic Hero Background ──────────────────────────────────────────────────
 function setHeroByTime() {
   const sky = document.getElementById('hero-sky');
@@ -157,7 +225,8 @@ function initScrollReveal() {
 document.addEventListener('DOMContentLoaded', () => {
   initSearch('search-input', 'search-dropdown');
   initSearch('nav-search',   'nav-search-dropdown');
-  initGeolocation();
+  initGeolocation();        // manual button — keep as-is
+  initAutoGeolocation();    // auto-trigger on homepage load
   setHeroByTime();
   initScrollReveal();
 

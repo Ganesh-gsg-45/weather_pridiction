@@ -124,38 +124,169 @@
     </section>
 
     <!-- ══════════════════════════════════════════════════════════════════
-         SECTION 2: HOURLY FORECAST STRIP
+         SECTION 2: MSN-STYLE HOURLY OVERVIEW WIDGET
          ══════════════════════════════════════════════════════════════════ -->
     <section class="msn-section fade-in-up delay-1" id="hourly-section">
-      <div class="msn-section-title">⏰ Hourly Forecast</div>
-      <div class="msn-hourly-strip">
-        {% for h in hourly %}
-        <div class="msn-hourly-card {% if loop.first %}msn-hourly-active{% endif %}" id="hcard-{{ loop.index }}">
-          <div class="msn-h-time">{{ h.time }}</div>
-          <div class="msn-h-icon">
-            {% if h.icon_class == "sun" %}☀️
-            {% elif h.icon_class == "moon" %}🌙
-            {% elif h.icon_class == "partly-cloudy" %}⛅
-            {% elif h.icon_class == "partly-cloudy-night" %}🌤
-            {% elif h.icon_class == "cloudy" %}🌥
-            {% elif h.icon_class == "overcast" %}☁️
-            {% elif h.icon_class == "rain" %}🌧
-            {% elif h.icon_class == "rain-sun" %}🌦
-            {% elif h.icon_class == "thunder" %}⛈
-            {% elif h.icon_class == "snow" %}❄️
-            {% elif h.icon_class == "fog" %}🌫
+
+      <!-- ── 7-Day Horizontal Day Strip ──────────────────────────────── -->
+      <div class="hw-day-strip" id="hw-day-strip">
+        {% for d in daily %}
+        <div class="hw-day-card {% if d.is_today %}hw-day-today{% endif %}">
+          <div class="hw-day-num">
+            {% set parts = d.date.split('-') %}{{ parts[2]|int }}
+          </div>
+          <div class="hw-day-name">
+            {% if d.is_today %}Today
+            {% elif loop.index == 2 %}Tomorrow
+            {% else %}
+              {% set wdays = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'] %}
+              {% set ymd = d.date.split('-') %}
+              {% set wd = (ymd[0]|int * 365 + ymd[1]|int * 31 + ymd[2]|int) % 7 %}
+              {{ wdays[wd] }}
+            {% endif %}
+          </div>
+          <div class="hw-day-icon">
+            {% if d.icon_class == "sun" %}☀️
+            {% elif d.icon_class == "moon" %}🌙
+            {% elif d.icon_class == "partly-cloudy" %}⛅
+            {% elif d.icon_class == "partly-cloudy-night" %}🌤
+            {% elif d.icon_class == "cloudy" %}🌥
+            {% elif d.icon_class == "overcast" %}☁️
+            {% elif d.icon_class == "rain" %}🌧
+            {% elif d.icon_class == "rain-sun" %}🌦
+            {% elif d.icon_class == "thunder" %}⛈
+            {% elif d.icon_class == "snow" %}❄️
+            {% elif d.icon_class == "fog" %}🌫
             {% else %}🌤{% endif %}
           </div>
-          <div class="msn-h-temp">{{ h.temp }}°</div>
-          {% if h.precip > 0 %}
-          <div class="msn-h-pop">💧 {{ h.precip }}%</div>
-          {% else %}
-          <div class="msn-h-pop" style="visibility:hidden;">-</div>
-          {% endif %}
+          <div class="hw-day-hi">{{ d.high }}°</div>
+          <div class="hw-day-lo">{{ d.low }}°</div>
         </div>
         {% endfor %}
       </div>
+
+      <!-- ── Tab Row + Chart/List Toggle ────────────────────────────── -->
+      <div class="hw-tab-bar">
+        <div class="hw-tabs" role="tablist">
+          <button class="hw-tab hw-tab-active" data-tab="overview"     role="tab" aria-selected="true">Overview</button>
+          <button class="hw-tab"               data-tab="precip"       role="tab">Precipitation</button>
+          <button class="hw-tab"               data-tab="wind"         role="tab">Wind</button>
+          <button class="hw-tab"               data-tab="aqi"          role="tab">Air Quality</button>
+          <button class="hw-tab"               data-tab="humidity"     role="tab">Humidity</button>
+          <button class="hw-tab"               data-tab="clouds"       role="tab">Cloud Cover</button>
+        </div>
+        <div class="hw-view-toggle">
+          <button class="hw-toggle-btn hw-toggle-active" id="hw-btn-chart" onclick="hwSetView('chart')">📈 Chart</button>
+          <button class="hw-toggle-btn"                  id="hw-btn-list"  onclick="hwSetView('list')">☰ List</button>
+        </div>
+      </div>
+
+      <!-- ── CHART VIEW ─────────────────────────────────────────────── -->
+      <div id="hw-chart-view">
+
+        <!-- Per-slot icon + value row above the chart -->
+        <div class="hw-slot-row" id="hw-slot-row">
+          {% for h in hourly %}
+          <div class="hw-slot-cell" data-idx="{{ loop.index0 }}">
+            <div class="hw-slot-time">{{ h.time }}</div>
+            <div class="hw-slot-icon">
+              {% if h.icon_class == "sun" %}☀️
+              {% elif h.icon_class == "moon" %}🌙
+              {% elif h.icon_class == "partly-cloudy" %}⛅
+              {% elif h.icon_class == "partly-cloudy-night" %}🌤
+              {% elif h.icon_class == "cloudy" %}🌥
+              {% elif h.icon_class == "overcast" %}☁️
+              {% elif h.icon_class == "rain" %}🌧
+              {% elif h.icon_class == "rain-sun" %}🌦
+              {% elif h.icon_class == "thunder" %}⛈
+              {% elif h.icon_class == "snow" %}❄️
+              {% elif h.icon_class == "fog" %}🌫
+              {% else %}🌤{% endif %}
+            </div>
+            <div class="hw-slot-val" id="hw-sv-{{ loop.index0 }}">{{ h.temp }}°</div>
+          </div>
+          {% endfor %}
+        </div>
+
+        <!-- Chart.js canvas -->
+        <div class="hw-chart-wrap">
+          <canvas id="hw-chart" height="160"></canvas>
+          <!-- Sunrise / Sunset pin markers (positioned by JS) -->
+          <div class="hw-sun-pin" id="hw-sunrise-pin" title="Sunrise">🌅</div>
+          <div class="hw-sun-pin" id="hw-sunset-pin"  title="Sunset">🌇</div>
+        </div>
+
+        <!-- Bottom Precipitation Intensity Strip (Overview tab only) -->
+        <div class="hw-precip-strip" id="hw-precip-strip">
+          {% for h in hourly %}
+          {% set p = h.precip %}
+          {% if p == 0 %}
+            {% set col = "rgba(255,255,255,0.04)" %}
+          {% elif p < 20 %}
+            {% set col = "rgba(96,165,250,0.18)" %}
+          {% elif p < 40 %}
+            {% set col = "rgba(59,130,246,0.35)" %}
+          {% elif p < 60 %}
+            {% set col = "rgba(37,99,235,0.50)" %}
+          {% elif p < 80 %}
+            {% set col = "rgba(29,78,216,0.65)" %}
+          {% else %}
+            {% set col = "rgba(30,58,138,0.85)" %}
+          {% endif %}
+          <div class="hw-precip-seg" style="background:{{ col }};"
+               title="{{ h.time }}: {{ p }}% precipitation">
+            {% if p > 0 %}<span class="hw-precip-pct">{{ p }}%</span>{% endif %}
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- ── LIST VIEW ─────────────────────────────────────────────────── -->
+      <div id="hw-list-view" style="display:none;">
+        <div class="hw-list-table">
+          <div class="hw-list-header">
+            <span>Time</span><span>Condition</span>
+            <span id="hw-list-col-label">Temp</span>
+            <span>Precip</span>
+          </div>
+          {% for h in hourly %}
+          <div class="hw-list-row">
+            <span class="hw-list-time">{{ h.time }}</span>
+            <span class="hw-list-icon">
+              {% if h.icon_class == "sun" %}☀️
+              {% elif h.icon_class == "moon" %}🌙
+              {% elif h.icon_class == "partly-cloudy" %}⛅
+              {% elif h.icon_class == "cloudy" %}🌥
+              {% elif h.icon_class == "overcast" %}☁️
+              {% elif h.icon_class == "rain" %}🌧
+              {% elif h.icon_class == "rain-sun" %}🌦
+              {% elif h.icon_class == "thunder" %}⛈
+              {% elif h.icon_class == "snow" %}❄️
+              {% elif h.icon_class == "fog" %}🌫
+              {% else %}🌤{% endif %}
+              <span style="font-size:0.72rem;color:var(--text-muted);">{{ h.desc }}</span>
+            </span>
+            <span class="hw-list-val"
+                  data-temp="{{ h.temp }}"
+                  data-precip="{{ h.precip }}"
+                  data-wind="{{ h.wind_speed }}"
+                  data-humidity="{{ h.humidity }}"
+                  data-clouds="{{ h.clouds }}"
+                  data-aqi="{{ aqi_index }}">{{ h.temp }}°C</span>
+            <span class="hw-list-precip">{% if h.precip > 0 %}💧{{ h.precip }}%{% else %}—{% endif %}</span>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- ── No Alerts Bar ─────────────────────────────────────────── -->
+      <div class="hw-alerts-bar">
+        <span class="hw-alerts-icon">🔔</span>
+        <span>No active weather alerts for this location</span>
+      </div>
+
     </section>
+
 
     <!-- ══════════════════════════════════════════════════════════════════
          SECTION 3: 5-DAY FORECAST (Expandable)
@@ -438,7 +569,7 @@
       }
     }
 
-    // ── Hourly card click ─────────────────────────────────────────────
+    // ── Hourly card click (legacy, kept for backward compat) ──────────────
     document.querySelectorAll('.msn-hourly-card').forEach(card => {
       card.addEventListener('click', () => {
         document.querySelectorAll('.msn-hourly-card').forEach(c => c.classList.remove('msn-hourly-active'));
@@ -446,5 +577,337 @@
       });
     });
   </script>
+
+  <!-- Chart.js 4 — used by the hourly widget below -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+  <script>
+  // ══════════════════════════════════════════════════════════════════════════
+  // HOURLY WIDGET — Tab switching, Chart.js, view toggle
+  // ══════════════════════════════════════════════════════════════════════════
+
+  // ── Hourly slot data injected from Jinja ──────────────────────────────────
+  const HW_SLOTS = [
+    {% for h in hourly %}
+    {
+      time:      "{{ h.time }}",
+      dt_txt:    "{{ h.dt_txt }}",
+      temp:      {{ h.temp }},
+      precip:    {{ h.precip }},
+      wind:      {{ h.wind_speed }},
+      wind_deg:  {{ h.wind_deg }},
+      humidity:  {{ h.humidity }},
+      clouds:    {{ h.clouds }},
+      icon:      "{{ h.icon_class }}",
+      desc:      "{{ h.desc }}"
+    }{% if not loop.last %},{% endif %}
+    {% endfor %}
+  ];
+
+  const HW_AQI_INDEX = {{ aqi_index }};
+
+  // ── Tab config ────────────────────────────────────────────────────────────
+  const HW_TABS = {
+    overview:  {
+      label:   'Temperature',
+      unit:    '°C',
+      color:   'rgba(251,191,36,1)',
+      grad0:   'rgba(251,191,36,0.55)',
+      grad1:   'rgba(37,99,235,0.08)',
+      getVal:  s => s.temp,
+      fmt:     v => v + '°',
+      chartType: 'line'
+    },
+    precip: {
+      label:   'Precipitation',
+      unit:    '%',
+      color:   'rgba(96,165,250,1)',
+      grad0:   'rgba(96,165,250,0.5)',
+      grad1:   'rgba(96,165,250,0.02)',
+      getVal:  s => s.precip,
+      fmt:     v => v + '%',
+      chartType: 'bar'
+    },
+    wind: {
+      label:   'Wind Speed',
+      unit:    'km/h',
+      color:   'rgba(52,211,153,1)',
+      grad0:   'rgba(52,211,153,0.45)',
+      grad1:   'rgba(52,211,153,0.02)',
+      getVal:  s => s.wind,
+      fmt:     v => v + ' km/h',
+      chartType: 'line'
+    },
+    aqi: {
+      label:   'Air Quality Index',
+      unit:    '/5',
+      color:   'rgba(167,139,250,1)',
+      grad0:   'rgba(167,139,250,0.45)',
+      grad1:   'rgba(167,139,250,0.02)',
+      getVal:  () => HW_AQI_INDEX,
+      fmt:     v => 'AQI ' + v,
+      chartType: 'bar',
+      note:    'ℹ Current AQI only — hourly AQI forecast not available on free plan'
+    },
+    humidity: {
+      label:   'Humidity',
+      unit:    '%',
+      color:   'rgba(56,189,248,1)',
+      grad0:   'rgba(56,189,248,0.45)',
+      grad1:   'rgba(56,189,248,0.02)',
+      getVal:  s => s.humidity,
+      fmt:     v => v + '%',
+      chartType: 'line'
+    },
+    clouds: {
+      label:   'Cloud Cover',
+      unit:    '%',
+      color:   'rgba(148,163,184,1)',
+      grad0:   'rgba(148,163,184,0.40)',
+      grad1:   'rgba(148,163,184,0.02)',
+      getVal:  s => s.clouds,
+      fmt:     v => v + '%',
+      chartType: 'line'
+    }
+  };
+
+  let hwChart = null;
+  let hwCurrentTab = 'overview';
+  let hwCurrentView = 'chart';
+
+  // ── Format "HH:MM" → "10 PM" ─────────────────────────────────────────────
+  function hwFmtTime(hhmm) {
+    const [h, m] = hhmm.split(':').map(Number);
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    const h12  = ((h % 12) || 12);
+    return m === 0 ? `${h12} ${ampm}` : `${h12}:${String(m).padStart(2,'0')} ${ampm}`;
+  }
+
+  // ── Wind direction arrow ──────────────────────────────────────────────────
+  function hwWindArrow(deg) {
+    const dirs = ['↑','↗','→','↘','↓','↙','←','↖'];
+    return dirs[Math.round(deg / 45) % 8];
+  }
+
+  // ── Build / update Chart.js instance ─────────────────────────────────────
+  function hwBuildChart(tabKey) {
+    const tab    = HW_TABS[tabKey];
+    const canvas = document.getElementById('hw-chart');
+    if (!canvas) return;
+    const ctx    = canvas.getContext('2d');
+
+    const labels = HW_SLOTS.map(s => hwFmtTime(s.time));
+    const values = HW_SLOTS.map(s => tab.getVal(s));
+
+    // Gradient fill
+    const grad = ctx.createLinearGradient(0, 0, 0, canvas.offsetHeight || 160);
+    grad.addColorStop(0, tab.grad0);
+    grad.addColorStop(1, tab.grad1);
+
+    const dataset = {
+      label:           tab.label,
+      data:            values,
+      borderColor:     tab.color,
+      backgroundColor: tab.chartType === 'bar' ? tab.grad0 : grad,
+      borderWidth:     2.5,
+      pointRadius:     4,
+      pointHoverRadius:7,
+      pointBackgroundColor: tab.color,
+      pointBorderColor:'rgba(0,0,0,0.4)',
+      pointBorderWidth:1,
+      fill:            true,
+      tension:         0.4,
+    };
+
+    if (hwChart) {
+      hwChart.destroy();
+      hwChart = null;
+    }
+
+    hwChart = new Chart(ctx, {
+      type: tab.chartType === 'bar' ? 'bar' : 'line',
+      data: { labels, datasets: [dataset] },
+      options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            enabled: true,
+            backgroundColor: 'rgba(11,26,46,0.95)',
+            borderColor:     tab.color,
+            borderWidth:     1,
+            titleColor:      'rgba(255,255,255,0.85)',
+            bodyColor:       '#fff',
+            padding:         12,
+            cornerRadius:    10,
+            displayColors:   false,
+            callbacks: {
+              title: (items) => {
+                const s = HW_SLOTS[items[0].dataIndex];
+                return hwFmtTime(s.time) + ' · ' + s.desc;
+              },
+              label: (item) => {
+                const s = HW_SLOTS[item.dataIndex];
+                const lines = [`  ${tab.label}: ${tab.fmt(item.raw)}`];
+                if (tabKey === 'overview') {
+                  lines.push(`  Precip: ${s.precip}%`);
+                  lines.push(`  Humidity: ${s.humidity}%`);
+                }
+                if (tabKey === 'wind') {
+                  lines.push(`  Direction: ${hwWindArrow(s.wind_deg)} ${s.wind_deg}°`);
+                }
+                return lines;
+              }
+            }
+          }
+        },
+        scales: {
+          x: {
+            grid:  { color: 'rgba(255,255,255,0.06)', drawBorder: false },
+            ticks: { color: 'rgba(255,255,255,0.55)', font: { size: 11 }, maxRotation: 0 }
+          },
+          y: {
+            position: 'right',
+            grid:  { color: 'rgba(255,255,255,0.06)', drawBorder: false },
+            ticks: {
+              color: 'rgba(255,255,255,0.55)',
+              font:  { size: 11 },
+              callback: v => tab.fmt(v)
+            }
+          }
+        }
+      }
+    });
+
+    // AQI note
+    const noteEl = document.getElementById('hw-aqi-note');
+    if (tab.note) {
+      if (!noteEl) {
+        const n = document.createElement('div');
+        n.id = 'hw-aqi-note';
+        n.className = 'hw-aqi-note';
+        n.textContent = tab.note;
+        document.getElementById('hw-chart-view').insertBefore(n, document.querySelector('.hw-chart-wrap'));
+      }
+    } else {
+      if (noteEl) noteEl.remove();
+    }
+  }
+
+  // ── Update the slot-row values above the chart ────────────────────────────
+  function hwUpdateSlotRow(tabKey) {
+    const tab = HW_TABS[tabKey];
+    HW_SLOTS.forEach((s, i) => {
+      const el = document.getElementById('hw-sv-' + i);
+      if (el) el.textContent = tab.fmt(tab.getVal(s));
+    });
+  }
+
+  // ── Position sunrise / sunset pins on the chart ───────────────────────────
+  function hwPositionSunPins() {
+    const wrap = document.querySelector('.hw-chart-wrap');
+    const risePin = document.getElementById('hw-sunrise-pin');
+    const setPin  = document.getElementById('hw-sunset-pin');
+    if (!wrap || !risePin || !setPin || !WD.sunrise) return;
+
+    const tzOffset = WD.timezone; // seconds offset from UTC
+    function utcTsToHHMM(ts) {
+      const d = new Date((ts + tzOffset) * 1000);
+      return `${String(d.getUTCHours()).padStart(2,'0')}:${String(d.getUTCMinutes()).padStart(2,'0')}`;
+    }
+
+    const srHHMM = utcTsToHHMM(WD.sunrise);
+    const ssHHMM = utcTsToHHMM(WD.sunset);
+
+    // Find closest slot index
+    function closestSlot(hhmm) {
+      const [h, m] = hhmm.split(':').map(Number);
+      const target = h * 60 + m;
+      let best = 0, bestDiff = Infinity;
+      HW_SLOTS.forEach((s, i) => {
+        const [sh, sm] = s.time.split(':').map(Number);
+        const diff = Math.abs((sh * 60 + sm) - target);
+        if (diff < bestDiff) { bestDiff = diff; best = i; }
+      });
+      return best;
+    }
+
+    const n = HW_SLOTS.length;
+    const riIdx = closestSlot(srHHMM);
+    const siIdx = closestSlot(ssHHMM);
+
+    function pin(pinEl, idx) {
+      const pct = (idx / (n - 1)) * 100;
+      pinEl.style.left = `calc(${pct}% + 12px)`;
+      pinEl.style.display = 'block';
+    }
+
+    pin(risePin, riIdx);
+    pin(setPin,  siIdx);
+  }
+
+  // ── Show/hide precip strip depending on tab ────────────────────────────────
+  function hwUpdatePrecipStrip(tabKey) {
+    const strip = document.getElementById('hw-precip-strip');
+    if (strip) strip.style.display = tabKey === 'overview' ? 'flex' : 'none';
+  }
+
+  // ── Switch tab ────────────────────────────────────────────────────────────
+  function hwSwitchTab(tabKey) {
+    hwCurrentTab = tabKey;
+    document.querySelectorAll('.hw-tab').forEach(btn => {
+      btn.classList.toggle('hw-tab-active', btn.dataset.tab === tabKey);
+      btn.setAttribute('aria-selected', btn.dataset.tab === tabKey);
+    });
+    hwBuildChart(tabKey);
+    hwUpdateSlotRow(tabKey);
+    hwUpdatePrecipStrip(tabKey);
+
+    // List view: update column label and values
+    const colLabel = document.getElementById('hw-list-col-label');
+    if (colLabel) colLabel.textContent = HW_TABS[tabKey].label;
+    document.querySelectorAll('.hw-list-val').forEach(el => {
+      const s = HW_SLOTS[el.closest('.hw-list-row')
+        ? [...el.closest('.hw-list-table').querySelectorAll('.hw-list-row')].indexOf(el.closest('.hw-list-row'))
+        : 0];
+      if (!s) return;
+      const map = { overview: 'temp', precip: 'precip', wind: 'wind', aqi: 'aqi', humidity: 'humidity', clouds: 'clouds' };
+      const field = map[tabKey];
+      const raw = field === 'aqi' ? HW_AQI_INDEX : parseFloat(el.dataset[field]);
+      el.textContent = HW_TABS[tabKey].fmt(raw);
+    });
+
+    setTimeout(hwPositionSunPins, 50);
+  }
+
+  // ── Toggle chart / list view ──────────────────────────────────────────────
+  function hwSetView(view) {
+    hwCurrentView = view;
+    document.getElementById('hw-chart-view').style.display = view === 'chart' ? 'block' : 'none';
+    document.getElementById('hw-list-view').style.display  = view === 'list'  ? 'block' : 'none';
+    document.getElementById('hw-btn-chart').classList.toggle('hw-toggle-active', view === 'chart');
+    document.getElementById('hw-btn-list').classList.toggle('hw-toggle-active',  view === 'list');
+    if (view === 'chart') {
+      setTimeout(() => { hwBuildChart(hwCurrentTab); hwPositionSunPins(); }, 30);
+    }
+  }
+
+  // ── Boot ──────────────────────────────────────────────────────────────────
+  document.addEventListener('DOMContentLoaded', () => {
+    // Wire tab clicks
+    document.querySelectorAll('.hw-tab').forEach(btn => {
+      btn.addEventListener('click', () => hwSwitchTab(btn.dataset.tab));
+    });
+    // Initial render
+    hwBuildChart('overview');
+    hwUpdateSlotRow('overview');
+    hwUpdatePrecipStrip('overview');
+    setTimeout(hwPositionSunPins, 200);
+  });
+
+  </script>
 </body>
 </html>
+

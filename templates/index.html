@@ -55,42 +55,44 @@
         <div class="search-dropdown" id="search-dropdown"></div>
       </div>
 
-      <!-- Recent Locations -->
-      <div class="recent-locations" id="recent-locations">
-        <div class="recent-label">Recent Locations</div>
-        <div class="recent-cards" id="recent-cards">
-          <!-- Populated by JS -->
-          <a href="/weather?city=Kavali" class="recent-card">
-            <div class="recent-city">Kavali</div>
-            <div class="recent-country">India</div>
-            <div class="recent-temp-row">
-              <span class="recent-icon">⛅</span>
-              <span class="recent-temp">35°</span>
-            </div>
-            <div class="recent-realfeel">RealFeel® 38°</div>
-          </a>
-          <a href="/weather?city=Madanapalle" class="recent-card">
-            <div class="recent-city">Madanapalle</div>
-            <div class="recent-country">India</div>
-            <div class="recent-temp-row">
-              <span class="recent-icon">🌥</span>
-              <span class="recent-temp">31°</span>
-            </div>
-            <div class="recent-realfeel">RealFeel® 30°</div>
-          </a>
-          <a href="/weather?city=London" class="recent-card">
-            <div class="recent-city">London</div>
-            <div class="recent-country">GB</div>
-            <div class="recent-temp-row">
-              <span class="recent-icon">🌦</span>
-              <span class="recent-temp">18°</span>
-            </div>
-            <div class="recent-realfeel">RealFeel® 16°</div>
-          </a>
-        </div>
+      <!-- Auto-geolocation loading toast (shown only while waiting for browser permission/response) -->
+      <div id="geo-loading-toast" style="
+        display: none;
+        margin-top: 1.2rem;
+        padding: 0.65rem 1.2rem;
+        background: rgba(255,255,255,0.12);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        border: 1px solid rgba(255,255,255,0.2);
+        border-radius: 2rem;
+        color: #fff;
+        font-size: 0.88rem;
+        font-weight: 500;
+        letter-spacing: 0.01em;
+        display: none;
+        align-items: center;
+        gap: 0.55rem;
+        width: fit-content;
+        margin-left: auto;
+        margin-right: auto;
+        animation: fadeInDown 0.3s ease;
+      " role="status" aria-live="polite">
+        <span style="animation: spin 1.2s linear infinite; display:inline-block;">🌐</span>
+        <span>Detecting your location…</span>
       </div>
+
     </div>
   </section>
+
+  <style>
+    @keyframes fadeInDown {
+      from { opacity: 0; transform: translateY(-8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
 
   <!-- ── Feature Banner ─────────────────────────────────────────────────── -->
   <section class="home-section-dark">

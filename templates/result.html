@@ -400,7 +400,7 @@
     <div class="metrics-row">
       <div class="metric-card">
         <div class="metric-icon">🌡️</div>
-        <div class="metric-val">{{ features.min_temp }}° / {{ features.max_temp }}°</div>
+        <div class="metric-val">{{ features.temperature_2m_min }}° / {{ features.temperature_2m_max }}°</div>
         <div class="metric-lbl">Min / Max Temp (°C)</div>
       </div>
       <div class="metric-card">
@@ -410,7 +410,7 @@
       </div>
       <div class="metric-card">
         <div class="metric-icon">💨</div>
-        <div class="metric-val">{{ features.wind_gust_speed }} km/h</div>
+        <div class="metric-val">{{ features.wind_gusts_10m_max }} km/h</div>
         <div class="metric-lbl">Max Wind Gust</div>
       </div>
     </div>
@@ -470,15 +470,15 @@
         </div>
         <div class="imp-item">
           <div class="imp-rank">2</div>
-          <div class="imp-label">🌡️ Temp at 3pm</div>
-          <div class="imp-bar-track"><div class="imp-bar-fill" style="width:{{ [(features.temp_3pm / 50 * 100), 100]|min }}%;"></div></div>
-          <div class="imp-value">{{ features.temp_3pm }}°C</div>
+          <div class="imp-label">☁️ Weather Code</div>
+          <div class="imp-bar-track"><div class="imp-bar-fill" style="width:{{ [(features.weather_code / 100 * 100), 100]|min }}%;"></div></div>
+          <div class="imp-value">{{ features.weather_code }}</div>
         </div>
         <div class="imp-item">
           <div class="imp-rank">3</div>
           <div class="imp-label">🌬️ Wind Gust</div>
-          <div class="imp-bar-track"><div class="imp-bar-fill" style="width:{{ [(features.wind_gust_speed / 120 * 100), 100]|min }}%;"></div></div>
-          <div class="imp-value">{{ features.wind_gust_speed }} km/h</div>
+          <div class="imp-bar-track"><div class="imp-bar-fill" style="width:{{ [(features.wind_gusts_10m_max / 120 * 100), 100]|min }}%;"></div></div>
+          <div class="imp-value">{{ features.wind_gusts_10m_max }} km/h</div>
         </div>
         <div class="imp-item">
           <div class="imp-rank">4</div>
@@ -489,8 +489,8 @@
         <div class="imp-item">
           <div class="imp-rank">5</div>
           <div class="imp-label">🌧️ Rainfall Today</div>
-          <div class="imp-bar-track"><div class="imp-bar-fill" style="width:{{ [features.rainfall * 10, 100]|min }}%;"></div></div>
-          <div class="imp-value">{{ features.rainfall }} mm</div>
+          <div class="imp-bar-track"><div class="imp-bar-fill" style="width:{{ [(features.precipitation_sum * 10), 100]|min }}%;"></div></div>
+          <div class="imp-value">{{ features.precipitation_sum }} mm</div>
         </div>
       </div>
     </div>
@@ -509,6 +509,32 @@
         </div>
       </div>
     </div>
+
+    <!-- ── 18 FEATURE CARDS ───────────────────────────────────────────── -->
+    <div class="section-card">
+      <div class="section-title">⚙️ All Auto-Derived Model Features (18)</div>
+      <div class="features-grid">
+        <div class="feat-card"><div class="feat-icon">🌡️</div><div class="feat-val">{{ features.temperature_2m_min }}°C</div><div class="feat-lbl">Min Temp</div></div>
+        <div class="feat-card"><div class="feat-icon">🌡️</div><div class="feat-val">{{ features.temperature_2m_max }}°C</div><div class="feat-lbl">Max Temp</div></div>
+        <div class="feat-card"><div class="feat-icon">🌡️</div><div class="feat-val">{{ features.apparent_temperature_min }}°C</div><div class="feat-lbl">Feels-Like Min</div></div>
+        <div class="feat-card"><div class="feat-icon">🌡️</div><div class="feat-val">{{ features.apparent_temperature_max }}°C</div><div class="feat-lbl">Feels-Like Max</div></div>
+        <div class="feat-card"><div class="feat-icon">🌧️</div><div class="feat-val">{{ features.precipitation_sum }} mm</div><div class="feat-lbl">Precipitation</div></div>
+        <div class="feat-card"><div class="feat-icon">☁️</div><div class="feat-val">{{ features.weather_code }}</div><div class="feat-lbl">Weather Code</div></div>
+        <div class="feat-card"><div class="feat-icon">💨</div><div class="feat-val">{{ features.wind_speed_10m_max }} km/h</div><div class="feat-lbl">Max Wind Speed</div></div>
+        <div class="feat-card"><div class="feat-icon">🌬️</div><div class="feat-val">{{ features.wind_gusts_10m_max }} km/h</div><div class="feat-lbl">Max Wind Gust</div></div>
+        <div class="feat-card"><div class="feat-icon">🧭</div><div class="feat-val">{{ features.wind_direction_10m_dominant }}°</div><div class="feat-lbl">Wind Direction</div></div>
+        <div class="feat-card"><div class="feat-icon">{% if features.rain_today %}🌧️{% else %}☀️{% endif %}</div><div class="feat-val">{% if features.rain_today %}Yes{% else %}No{% endif %}</div><div class="feat-lbl">Rain Today</div></div>
+        <div class="feat-card"><div class="feat-icon">📅</div><div class="feat-val">{{ features.day }}</div><div class="feat-lbl">Day</div></div>
+        <div class="feat-card"><div class="feat-icon">📆</div><div class="feat-val">{{ features.month }}</div><div class="feat-lbl">Month</div></div>
+        <div class="feat-card"><div class="feat-icon">🗓️</div><div class="feat-val">{{ features.year }}</div><div class="feat-lbl">Year</div></div>
+        <div class="feat-card"><div class="feat-icon">📍</div><div class="feat-val">{{ features.resolved_city }}</div><div class="feat-lbl">Resolved Location</div></div>
+      </div>
+
+      <div class="note-box" style="margin-top:1.25rem;">
+        <strong>Estimation Note:</strong>
+        Sunshine hours are estimated from cloud cover density. Evaporation is calculated using the Hargreaves solar radiation model. Both are not directly available from the OpenWeatherMap free tier.
+      </div>
+    </div>
     {% endif %}
 
     <!-- ── ACTION BUTTONS ─────────────────────────────────────────────── -->
@@ -520,6 +546,7 @@
 
   </div><!-- /page -->
 
+  {% if features %}
   <script>
     // ── Temperature Max/Min Chart ────────────────────────────────────────────────────
     const tempCtx = document.getElementById('tempChart').getContext('2d');
@@ -573,102 +600,7 @@
       }
     });
   </script>
-    <!-- ── 18 FEATURE CARDS ───────────────────────────────────────────── -->
-    <div class="section-card">
-      <div class="section-title">⚙️ All Auto-Derived Model Features (18)</div>
-      <div class="features-grid">
-        <div class="feat-card"><div class="feat-icon">🌡️</div><div class="feat-val">{{ features.temperature_2m_min }}°C</div><div class="feat-lbl">Min Temp</div></div>
-        <div class="feat-card"><div class="feat-icon">🌡️</div><div class="feat-val">{{ features.temperature_2m_max }}°C</div><div class="feat-lbl">Max Temp</div></div>
-        <div class="feat-card"><div class="feat-icon">🌡️</div><div class="feat-val">{{ features.apparent_temperature_min }}°C</div><div class="feat-lbl">Feels-Like Min</div></div>
-        <div class="feat-card"><div class="feat-icon">🌡️</div><div class="feat-val">{{ features.apparent_temperature_max }}°C</div><div class="feat-lbl">Feels-Like Max</div></div>
-        <div class="feat-card"><div class="feat-icon">🌧️</div><div class="feat-val">{{ features.precipitation_sum }} mm</div><div class="feat-lbl">Precipitation</div></div>
-        <div class="feat-card"><div class="feat-icon">☁️</div><div class="feat-val">{{ features.weather_code }}</div><div class="feat-lbl">Weather Code</div></div>
-        <div class="feat-card"><div class="feat-icon">💨</div><div class="feat-val">{{ features.wind_speed_10m_max }} km/h</div><div class="feat-lbl">Max Wind Speed</div></div>
-        <div class="feat-card"><div class="feat-icon">🌬️</div><div class="feat-val">{{ features.wind_gusts_10m_max }} km/h</div><div class="feat-lbl">Max Wind Gust</div></div>
-        <div class="feat-card"><div class="feat-icon">🧭</div><div class="feat-val">{{ features.wind_direction_10m_dominant }}°</div><div class="feat-lbl">Wind Direction</div></div>
-        <div class="feat-card"><div class="feat-icon">{% if features.rain_today %}🌧️{% else %}☀️{% endif %}</div><div class="feat-val">{% if features.rain_today %}Yes{% else %}No{% endif %}</div><div class="feat-lbl">Rain Today</div></div>
-        <div class="feat-card"><div class="feat-icon">📅</div><div class="feat-val">{{ features.day }}</div><div class="feat-lbl">Day</div></div>
-        <div class="feat-card"><div class="feat-icon">📆</div><div class="feat-val">{{ features.month }}</div><div class="feat-lbl">Month</div></div>
-        <div class="feat-card"><div class="feat-icon">🗓️</div><div class="feat-val">{{ features.year }}</div><div class="feat-lbl">Year</div></div>
-        <div class="feat-card"><div class="feat-icon">📍</div><div class="feat-val">{{ features.resolved_city }}</div><div class="feat-lbl">Resolved Location</div></div>
-      </div>
+  {% endif %}
 
-      <div class="note-box" style="margin-top:1.25rem;">
-        <strong>Estimation Note:</strong>
-        Sunshine hours are estimated from cloud cover density. Evaporation is calculated using the Hargreaves solar radiation model. Both are not directly available from the OpenWeatherMap free tier.
-      </div>
-    </div>
-    {% endif %}
-
-    <!-- ── ACTION BUTTONS ─────────────────────────────────────────────── -->
-    <div class="action-row">
-      <a href="/predict-form" class="btn-primary">Run Another Prediction</a>
-      <a href="/predict-form?multi=1" class="btn-secondary">5-Day AI Timeline</a>
-      <a href="/weather?city={{ city }}" class="btn-ghost">View Live Weather</a>
-    </div>
-
-  </div><!-- /page -->
-
-  <script>
-    // ── Humidity Chart ────────────────────────────────────────────────────
-    const humCtx = document.getElementById('humidityChart').getContext('2d');
-    new Chart(humCtx, {
-      type: 'line',
-      data: {
-        labels: ['9:00 AM', '3:00 PM'],
-        datasets: [{
-          label: 'Humidity %',
-          data: [{{ features.humidity_9am }}, {{ features.humidity_3pm }}],
-          borderColor: '#60a5fa',
-          backgroundColor: 'rgba(96,165,250,0.12)',
-          borderWidth: 2.5,
-          tension: 0.4,
-          fill: true,
-          pointBackgroundColor: '#60a5fa',
-          pointRadius: 5,
-        }]
-      },
-      options: {
-        responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
-        scales: {
-          x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: 'rgba(240,244,248,0.5)', font: { size: 11 } } },
-          y: {
-            grid: { color: 'rgba(255,255,255,0.05)' },
-            ticks: { color: 'rgba(240,244,248,0.5)', font: { size: 11 } },
-            min: 0, max: 100,
-          }
-        }
-      }
-    });
-
-    // ── Pressure Chart ────────────────────────────────────────────────────
-    const presCtx = document.getElementById('pressureChart').getContext('2d');
-    new Chart(presCtx, {
-      type: 'line',
-      data: {
-        labels: ['9:00 AM', '3:00 PM'],
-        datasets: [{
-          label: 'Pressure hPa',
-          data: [{{ features.pressure_9am }}, {{ features.pressure_3pm }}],
-          borderColor: '#f59e0b',
-          backgroundColor: 'rgba(245,158,11,0.1)',
-          borderWidth: 2.5,
-          tension: 0.4,
-          fill: true,
-          pointBackgroundColor: '#f59e0b',
-          pointRadius: 5,
-        }]
-      },
-      options: {
-        responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
-        scales: {
-          x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: 'rgba(240,244,248,0.5)', font: { size: 11 } } },
-          y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: 'rgba(240,244,248,0.5)', font: { size: 11 } } }
-        }
-      }
-    });
-  </script>
 </body>
 </html>
