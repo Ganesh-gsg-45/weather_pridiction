@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Climate Trends &mdash; {{ city }}{% if country %}, {{ country }}{% endif %} | GOOD WEATHER</title>
+  <meta name="description" content="Historical climate trends and 12-month weather data for {{ city }}. Temperature, precipitation, humidity and wind comparisons." />
+  <link rel="icon" type="image/svg+xml" href="/static/images/favicon.svg" />
+  <link rel="stylesheet" href="/static/css/style.css" />
+  <style>
+    .trends-layout { max-width:1140px; margin:0 auto; padding:1.5rem 1.5rem 3rem; }
+    .trends-hero { display:flex; align-items:flex-start; gap:1.25rem; margin-bottom:2rem; }
+    .trends-hero-left { flex:1; }
+    .trends-city-label { font-size:2rem; font-weight:800; letter-spacing:-0.03em; line-height:1.1; }
+    .trends-subtitle { margin-top:.35rem; font-size:.875rem; color:var(--text-muted); }
+    .trends-subtitle strong { color:var(--orange); }
+    .trends-back-btn { display:inline-flex; align-items:center; gap:.4rem; padding:.5rem 1rem; border-radius:var(--radius-sm); background:var(--glass-bg); border:1px solid var(--card-border); color:var(--text-muted); text-decoration:none; font-size:.82rem; font-weight:500; transition:all var(--transition); white-space:nowrap; }
+    .trends-back-btn:hover { color:var(--text); background:rgba(255,255,255,.12); }
+    .trends-no-hist-banner { display:flex; align-items:center; gap:.75rem; padding:.85rem 1.25rem; border-radius:var(--radius-md); background:rgba(245,158,11,.1); border:1px solid rgba(245,158,11,.3); color:var(--orange); font-size:.82rem; margin-bottom:1.5rem; }
+    .trends-tab-bar { display:flex; align-items:center; gap:.25rem; background:var(--card-bg); border:1px solid var(--card-border); border-radius:var(--radius-md); padding:.3rem; margin-bottom:1.5rem; overflow-x:auto; }
+    .trends-tab { padding:.45rem 1.1rem; border-radius:var(--radius-sm); border:none; background:transparent; color:var(--text-muted); font-size:.82rem; font-weight:500; cursor:pointer; transition:all var(--transition); white-space:nowrap; font-family:inherit; }
+    .trends-tab:hover { color:var(--text); background:rgba(255,255,255,.06); }
+    .trends-tab.trends-tab-active { background:var(--orange); color:#000; font-weight:700; }
+    .trends-chart-card { background:var(--card-bg); border:1px solid var(--card-border); border-radius:var(--radius-xl); padding:1.5rem 1.75rem; margin-bottom:1.5rem; backdrop-filter:var(--glass-blur); position:relative; overflow:hidden; }
+    .trends-chart-card::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; background:linear-gradient(90deg,var(--tab-color,var(--orange)),transparent); border-radius:var(--radius-xl) var(--radius-xl) 0 0; }
+    .trends-chart-title { font-size:1rem; font-weight:700; margin-bottom:.4rem; }
+    .trends-chart-subtitle { font-size:.78rem; color:var(--text-muted); margin-bottom:1.25rem; }
+    .trends-chart-wrap { position:relative; height:320px; }
+    .trends-chart-wrap canvas { width:100%!important; height:100%!important; }
+    .trends-legend { display:flex; align-items:center; gap:1.5rem; margin-top:1rem; flex-wrap:wrap; }
+    .trends-legend-item { display:flex; align-items:center; gap:.5rem; font-size:.78rem; color:var(--text-muted); }
+    .trends-legend-line { width:32px; height:2px; }
+    .trends-legend-note { font-size:.73rem; color:rgba(245,158,11,.8); display:flex; align-items:center; gap:.35rem; }
+    .trends-humid-note { display:flex; align-items:flex-start; gap:.6rem; padding:.7rem 1rem; border-radius:var(--radius-sm); background:rgba(56,189,248,.08); border:1px solid rgba(56,189,248,.2); color:rgba(56,189,248,.9); font-size:.78rem; margin-bottom:.85rem; line-height:1.5; }
+    .trends-overview-grid { display:grid; grid-template-columns:300px 1fr; gap:1.5rem; align-items:center; margin-bottom:1.5rem; }
+    @media(max-width:700px) { .trends-overview-grid { grid-template-columns:1fr; } }
+    .trends-donut-wrap { background:var(--card-bg); border:1px solid var(--card-border); border-radius:var(--radius-xl); padding:1.5rem; backdrop-filter:var(--glass-blur); text-align:center; }
+    .trends-donut-title { font-size:.9rem; font-weight:700; margin-bottom:1rem; }
+    .trends-donut-canvas-wrap { position:relative; width:200px; height:200px; margin:0 auto; }
+    .trends-donut-canvas-wrap canvas { width:100%!important; height:100%!important; }
+    .trends-donut-label { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; pointer-events:none; }
+    .trends-donut-label-main { font-size:1.6rem; font-weight:800; line-height:1; }
+    .trends-donut-label-sub { font-size:.7rem; color:var(--text-muted); margin-top:.2rem; }
+    .trends-donut-legend { display:flex; justify-content:center; gap:1.25rem; margin-top:1rem; flex-wrap:wrap; }
+    .trends-donut-leg-item { display:flex; align-items:center; gap:.45rem; font-size:.73rem; color:var(--text-muted); }
+    .trends-donut-leg-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+    .trends-stats-card { background:var(--card-bg); border:1px solid var(--card-border); border-radius:var(--radius-xl); padding:1.5rem 1.75rem; backdrop-filter:var(--glass-blur); }
+    .trends-stats-title { font-size:.9rem; font-weight:700; margin-bottom:1.25rem; }
+    .trends-stat-row { display:flex; align-items:center; justify-content:space-between; padding:.65rem 0; border-bottom:1px solid var(--card-border); }
+    .trends-stat-row:last-child { border-bottom:none; }
+    .trends-stat-label { display:flex; align-items:center; gap:.5rem; font-size:.82rem; color:var(--text-muted); }
+    .trends-stat-vals { display:flex; align-items:center; gap:1rem; flex-wrap:wrap; justify-content:flex-end; }
+    .trends-stat-val { font-size:.9rem; font-weight:600; }
+    .trends-stat-val.actual { color:#fbbf24; }
+    .trends-stat-val.hist   { color:rgba(96,165,250,.85); font-size:.8rem; font-weight:400; }
+    .trends-loading { display:flex; align-items:center; justify-content:center; gap:.75rem; padding:3rem; color:var(--text-muted); font-size:.85rem; }
+    .trends-spinner { width:20px; height:20px; border:2px solid rgba(255,255,255,.15); border-top-color:var(--orange); border-radius:50%; animation:spin .8s linear infinite; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+    .trends-error { text-align:center; padding:3rem; color:var(--text-muted); }
+    .trends-cities-note { font-size:.75rem; color:var(--text-dim); margin-top:.5rem; }
+    .trends-city-tag { display:inline-block; padding:.2rem .6rem; border-radius:99px; background:rgba(255,255,255,.07); border:1px solid var(--card-border); color:var(--text-muted); font-size:.73rem; text-decoration:none; margin:.15rem; transition:all var(--transition); }
+    .trends-city-tag:hover { background:rgba(245,158,11,.15); border-color:rgba(245,158,11,.4); color:var(--orange); }
+    .msn-breadcrumb { margin-bottom:1.25rem; }
+  </style>
+</head>
+<body class="msn-body">
+
+  <!-- Sticky Navbar -->
+  <nav class="navbar">
+    <a href="/" class="navbar-brand">
+      <img src="/static/images/logo.svg" alt="GOOD WEATHER" style="height:32px;" />
+    </a>
+    <div style="position:relative;flex:1;max-width:400px;margin:0 1.5rem;">
+      <div class="search-box" style="height:40px;">
+        <span class="search-icon" style="font-size:.9rem;">&#128269;</span>
+        <input type="text" class="search-input" id="nav-search" placeholder="Search city..." autocomplete="off" style="font-size:.9rem;" />
+      </div>
+      <div class="search-dropdown" id="nav-search-dropdown"></div>
+    </div>
+    <a href="/predict-form" class="btn-ml" style="white-space:nowrap;">&#129302; Predict Rain</a>
+  </nav>
+
+  <div class="trends-layout">
+
+    <!-- Breadcrumb -->
+    <div class="msn-breadcrumb">
+      <a href="/" class="back-link">&larr; GOOD WEATHER</a>
+      <span class="msn-breadcrumb-sep">&rsaquo;</span>
+      {% if city %}
+      <a href="/weather?city={{ city }}&amp;lat={{ lat }}&amp;lon={{ lon }}" class="back-link">{{ city }}{% if country %}, {{ country }}{% endif %}</a>
+      <span class="msn-breadcrumb-sep">&rsaquo;</span>
+      {% endif %}
+      <span>Climate Trends</span>
+    </div>
+
+    {% if error is defined and error %}
+    <div class="trends-error">
+      <div style="font-size:3rem;margin-bottom:1rem;">&#127785;</div>
+      <div style="font-size:1.1rem;font-weight:700;margin-bottom:.5rem;">Location Not Found</div>
+      <p>{{ error }}</p>
+      <a href="/" class="btn-ml" style="margin-top:1.5rem;display:inline-block;">&larr; Back to Home</a>
+    </div>
+
+    {% else %}
+
+    <!-- Hero Header -->
+    <div class="trends-hero">
+      <div class="trends-hero-left">
+        <div class="trends-city-label">&#128202; {{ city }}{% if country %}, {{ country }}{% endif %}</div>
+        <div class="trends-subtitle">
+          Climate Trends &nbsp;&middot;&nbsp; Last 12 months vs
+          {% if has_hist %}
+          <strong>24-year historical average (2000&ndash;2024)</strong>
+          {% else %}
+          historical avg <em style="color:var(--text-dim);">(not available for this city)</em>
+          {% endif %}
+        </div>
+        {% if not has_hist %}
+        <div class="trends-cities-note" style="margin-top:.5rem;">
+          Historical data available for:
+          {% for c in hist_cities %}
+          <a class="trends-city-tag" href="/trends?city={{ c }}&lat={{ lat }}&lon={{ lon }}">{{ c }}</a>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
+      <a href="/weather?city={{ city }}&lat={{ lat }}&lon={{ lon }}" class="trends-back-btn">
+        &larr; Back to Weather
+      </a>
+    </div>
+
+    {% if not has_hist %}
+    <div class="trends-no-hist-banner">
+      &#9888;&#65039; &nbsp;No 24-year historical data for <strong>{{ city }}</strong>. Showing last-12-months actual data only.
+    </div>
+    {% endif %}
+
+    <!-- Tab Bar -->
+    <div class="trends-tab-bar" role="tablist" id="trends-tab-bar">
+      <button class="trends-tab trends-tab-active" data-tab="temperature"   role="tab" aria-selected="true"  id="tab-temperature">&#127777; Temperature</button>
+      <button class="trends-tab"                   data-tab="precipitation" role="tab" aria-selected="false" id="tab-precipitation">&#127783; Precipitation</button>
+      <button class="trends-tab"                   data-tab="humidity"      role="tab" aria-selected="false" id="tab-humidity">&#128167; Humidity</button>
+      <button class="trends-tab"                   data-tab="wind"          role="tab" aria-selected="false" id="tab-wind">&#128168; Wind</button>
+    </div>
+
+    <!-- Chart Card -->
+    <div class="trends-chart-card" id="trends-chart-card">
+      <div class="trends-chart-title"    id="trends-chart-title">Temperature &mdash; Last 12 months</div>
+      <div class="trends-chart-subtitle" id="trends-chart-subtitle">Daily max &amp; min temperature (&deg;C)</div>
+
+      <div class="trends-humid-note" id="trends-humid-note" style="display:none;">
+        &#8505;&#65039; &nbsp;Humidity data is sourced from Open-Meteo (daily mean, last 12 months).
+        A 24-year historical average for relative humidity is <strong>not available</strong> in our dataset &mdash; only the actual line is shown.
+      </div>
+
+      <div class="trends-loading" id="trends-loading">
+        <div class="trends-spinner"></div>
+        Loading data from Open-Meteo&hellip;
+      </div>
+
+      <div class="trends-chart-wrap" id="trends-chart-wrap" style="display:none;">
+        <canvas id="trends-main-chart"></canvas>
+      </div>
+
+      <div class="trends-legend" id="trends-legend" style="display:none;">
+        <div class="trends-legend-item">
+          <div class="trends-legend-line" id="leg-actual-line" style="background:#fbbf24;"></div>
+          <span id="leg-actual-label">Last 12 months (actual)</span>
+        </div>
+        <div class="trends-legend-item" id="leg-hist-item">
+          <div class="trends-legend-line" id="leg-hist-line" style="background:repeating-linear-gradient(to right,rgba(96,165,250,0.85) 0,rgba(96,165,250,0.85) 6px,transparent 6px,transparent 10px);"></div>
+          <span>24-yr historical avg (2000&ndash;2024)</span>
+        </div>
+        <div class="trends-legend-note" id="leg-no-hist-note" style="display:none;">
+          &#9888; Historical average not available for humidity
+        </div>
+      </div>
+    </div>
+
+    <!-- Donut + Stats -->
+    <div class="trends-overview-grid">
+      <div class="trends-donut-wrap">
+        <div class="trends-donut-title">Weather Overview</div>
+        <div class="trends-donut-canvas-wrap">
+          <canvas id="trends-donut-chart"></canvas>
+          <div class="trends-donut-label">
+            <div class="trends-donut-label-main" id="donut-center-val">&mdash;</div>
+            <div class="trends-donut-label-sub"  id="donut-center-sub">Annual Avg</div>
+          </div>
+        </div>
+        <div class="trends-donut-legend">
+          <div class="trends-donut-leg-item">
+            <div class="trends-donut-leg-dot" style="background:#fbbf24;"></div>
+            Actual (12 mo)
+          </div>
+          <div class="trends-donut-leg-item">
+            <div class="trends-donut-leg-dot" style="background:rgba(96,165,250,0.7);"></div>
+            Hist avg (24 yr)
+          </div>
+        </div>
+      </div>
+
+      <div class="trends-stats-card">
+        <div class="trends-stats-title">&#128200; Annual Summary &mdash; {{ city }}</div>
+        <div id="trends-stats-table">
+          <div class="trends-loading" style="padding:1.5rem;">
+            <div class="trends-spinner"></div>&nbsp;Loading&hellip;
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {% endif %}
+  </div>
+
+  <footer class="footer">
+    <p>&copy; 2026 GOOD WEATHER &nbsp;&middot;&nbsp; Actual data by <a href="https://open-meteo.com" target="_blank">Open-Meteo</a> &nbsp;&middot;&nbsp; Historical avg: dataset 2000&ndash;2024 &nbsp;&middot;&nbsp; <a href="/">Home</a></p>
+  </footer>
+
+  <script src="/static/js/app.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script>
+  // ============================================================
+  // TRENDS PAGE — Data fetching + Chart rendering
+  // ============================================================
+
+  const TR = {
+    city:     "{{ city | e }}",
+    country:  "{{ country | e }}",
+    lat:      {{ lat | default(28.6139) }},
+    lon:      {{ lon | default(77.2090) }},
+    histCity: {{ ('"%s"' % hist_city) | safe if (hist_city is defined and hist_city) else 'null' }},
+    hasHist:  {{ 'true' if (has_hist is defined and has_hist) else 'false' }},
+  };
+
+  const TABS = {
+    temperature: {
+      label:'Temperature', subtitle:'Daily max & min temperature (C)', unit:'C',
+      actualColor:'#fbbf24', histColor:'rgba(96,165,250,0.85)',
+      histMetric:'tmax', histMetric2:'tmin',
+      omeoKeys:['temperature_2m_max','temperature_2m_min'],
+      hasHist:true, cardColor:'#fbbf24',
+    },
+    precipitation: {
+      label:'Precipitation', subtitle:'Daily precipitation sum (mm)', unit:'mm',
+      actualColor:'rgba(96,165,250,1)', histColor:'rgba(167,139,250,0.85)',
+      histMetric:'precip', histMetric2:null,
+      omeoKeys:['precipitation_sum'],
+      hasHist:true, cardColor:'rgba(96,165,250,1)',
+    },
+    humidity: {
+      label:'Humidity', subtitle:'Mean relative humidity (%)', unit:'%',
+      actualColor:'rgba(56,189,248,1)', histColor:null,
+      histMetric:null, histMetric2:null,
+      omeoKeys:['relative_humidity_2m_mean'],
+      hasHist:false, cardColor:'rgba(56,189,248,1)',
+    },
+    wind: {
+      label:'Wind Speed', subtitle:'Daily max wind speed (km/h)', unit:'km/h',
+      actualColor:'rgba(52,211,153,1)', histColor:'rgba(248,113,113,0.85)',
+      histMetric:'wind', histMetric2:null,
+      omeoKeys:['wind_speed_10m_max'],
+      hasHist:true, cardColor:'rgba(52,211,153,1)',
+    },
+  };
+
+  let mainChart = null, donutChart = null;
+  const cache = { actual: null, hist: {} };
+
+  function doyFromDate(d) {
+    const start = new Date(d.getFullYear(), 0, 0);
+    const diff = d - start + (start.getTimezoneOffset() - d.getTimezoneOffset()) * 60000;
+    return Math.floor(diff / 86400000);
+  }
+
+  function dateRange12Months() {
+    const end = new Date();
+    end.setDate(end.getDate() - 1);
+    const start = new Date(end);
+    start.setFullYear(start.getFullYear() - 1);
+    start.setDate(start.getDate() + 1);
+    return { start: start.toISOString().slice(0, 10), end: end.toISOString().slice(0, 10) };
+  }
+
+  function fmtDate(ds) {
+    const d = new Date(ds + 'T00:00:00');
+    return d.toLocaleDateString('en-IN', { month: 'short', day: 'numeric' });
+  }
+
+  function round1(v) { return Math.round(v * 10) / 10; }
+
+  async function fetchActual() {
+    if (cache.actual) return cache.actual;
+    const { start, end } = dateRange12Months();
+    const vars = 'temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,relative_humidity_2m_mean';
+    const url = 'https://archive-api.open-meteo.com/v1/archive?latitude=' + TR.lat +
+      '&longitude=' + TR.lon + '&start_date=' + start + '&end_date=' + end +
+      '&daily=' + vars + '&timezone=auto';
+    const r = await fetch(url);
+    if (!r.ok) throw new Error('Open-Meteo API error: ' + r.status);
+    cache.actual = await r.json();
+    return cache.actual;
+  }
+
+  async function fetchHist(metric) {
+    if (cache.hist[metric]) return cache.hist[metric];
+    if (!TR.histCity) return [];
+    const url = '/api/trends?city=' + encodeURIComponent(TR.histCity) + '&metric=' + metric + '&doy_start=1&doy_end=365';
+    const r = await fetch(url);
+    if (!r.ok) throw new Error('Hist API error: ' + r.status);
+    const j = await r.json();
+    cache.hist[metric] = j.data || [];
+    return cache.hist[metric];
+  }
+
+  function buildLut(data) {
+    const lut = {};
+    data.forEach(d => { lut[d.doy] = d.value; });
+    return lut;
+  }
+
+  function setLoading(show) {
+    document.getElementById('trends-loading').style.display    = show ? 'flex' : 'none';
+    document.getElementById('trends-chart-wrap').style.display = show ? 'none' : 'block';
+    document.getElementById('trends-legend').style.display     = show ? 'none' : 'flex';
+  }
+
+  async function renderTab(tabKey) {
+    const tab = TABS[tabKey];
+    document.getElementById('trends-chart-card').style.setProperty('--tab-color', tab.cardColor);
+    document.getElementById('trends-chart-title').textContent    = tab.label + ' — Last 12 months';
+    document.getElementById('trends-chart-subtitle').textContent = tab.subtitle;
+    document.getElementById('trends-humid-note').style.display   = tabKey === 'humidity' ? 'flex' : 'none';
+    setLoading(true);
+
+    try {
+      const actual = await fetchActual();
+      const dates  = actual.daily.time;
+      const labels = dates.map(fmtDate);
+
+      const todayStr = new Date().toISOString().slice(0, 10);
+      let todayIdx   = dates.findIndex(d => d >= todayStr);
+      if (todayIdx < 0) todayIdx = dates.length - 1;
+
+      const datasets = [];
+
+      if (tabKey === 'temperature') {
+        const tmaxV = actual.daily['temperature_2m_max'];
+        const tminV = actual.daily['temperature_2m_min'];
+        datasets.push({ label: 'Max Temp (actual)', data: tmaxV, borderColor: '#fbbf24', backgroundColor: 'rgba(251,191,36,0.07)', borderWidth: 2, pointRadius: 0, pointHoverRadius: 5, fill: false, tension: 0.35 });
+        datasets.push({ label: 'Min Temp (actual)', data: tminV, borderColor: 'rgba(251,191,36,0.42)', backgroundColor: 'transparent', borderWidth: 1.5, pointRadius: 0, pointHoverRadius: 4, fill: false, tension: 0.35 });
+        if (TR.hasHist && TR.histCity) {
+          const [htD, htnD] = await Promise.all([fetchHist('tmax'), fetchHist('tmin')]);
+          const lut1 = buildLut(htD), lut2 = buildLut(htnD);
+          datasets.push({ label: 'Max Temp (hist avg)', data: dates.map(d => { const doy = doyFromDate(new Date(d + 'T00:00:00')); return lut1[doy] != null ? lut1[doy] : null; }), borderColor: 'rgba(96,165,250,0.85)', backgroundColor: 'transparent', borderWidth: 1.8, borderDash: [6,4], pointRadius: 0, pointHoverRadius: 4, fill: false, tension: 0.35 });
+          datasets.push({ label: 'Min Temp (hist avg)', data: dates.map(d => { const doy = doyFromDate(new Date(d + 'T00:00:00')); return lut2[doy] != null ? lut2[doy] : null; }), borderColor: 'rgba(96,165,250,0.42)', backgroundColor: 'transparent', borderWidth: 1.4, borderDash: [4,4], pointRadius: 0, pointHoverRadius: 3, fill: false, tension: 0.35 });
+        }
+      } else {
+        const key  = tab.omeoKeys[0];
+        const vals = actual.daily[key];
+        const bg   = tabKey === 'precipitation' ? tab.actualColor.replace(/[\d.]+\)$/, '0.30)') : tab.actualColor.replace(/[\d.]+\)$/, '0.08)');
+        datasets.push({ label: tab.label + ' (actual)', data: vals, borderColor: tab.actualColor, backgroundColor: bg, borderWidth: 2, pointRadius: 0, pointHoverRadius: 5, fill: tabKey === 'precipitation', tension: tabKey === 'precipitation' ? 0 : 0.35 });
+        if (TR.hasHist && TR.histCity && tab.hasHist && tab.histMetric) {
+          const histD = await fetchHist(tab.histMetric);
+          const lut   = buildLut(histD);
+          datasets.push({ label: tab.label + ' (hist avg)', data: dates.map(d => { const doy = doyFromDate(new Date(d + 'T00:00:00')); return lut[doy] != null ? lut[doy] : null; }), borderColor: tab.histColor, backgroundColor: 'transparent', borderWidth: 1.8, borderDash: [6,4], pointRadius: 0, pointHoverRadius: 4, fill: false, tension: 0.35 });
+        }
+      }
+
+      const canvas = document.getElementById('trends-main-chart');
+      const ctx    = canvas.getContext('2d');
+      if (mainChart) { mainChart.destroy(); mainChart = null; }
+
+      const todayPlugin = {
+        id: 'todayLine',
+        afterDraw(chart) {
+          const meta = chart.getDatasetMeta(0);
+          if (!meta.data || !meta.data[todayIdx]) return;
+          const x = meta.data[todayIdx].x;
+          const { top, bottom } = chart.chartArea;
+          const cx = chart.ctx;
+          cx.save();
+          cx.beginPath(); cx.setLineDash([4,3]); cx.strokeStyle = 'rgba(245,158,11,0.65)'; cx.lineWidth = 1.5;
+          cx.moveTo(x, top); cx.lineTo(x, bottom); cx.stroke();
+          cx.setLineDash([]); cx.fillStyle = 'rgba(245,158,11,0.85)';
+          cx.font = 'bold 10px Inter,sans-serif'; cx.textAlign = 'center';
+          cx.fillText('Today', x, top - 5); cx.restore();
+        }
+      };
+
+      mainChart = new Chart(ctx, {
+        type: tabKey === 'precipitation' ? 'bar' : 'line',
+        data: { labels, datasets },
+        plugins: [todayPlugin],
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              enabled: true, backgroundColor: 'rgba(11,26,46,0.96)', borderColor: tab.cardColor, borderWidth: 1,
+              titleColor: 'rgba(255,255,255,0.9)', bodyColor: '#fff', padding: 12, cornerRadius: 10, displayColors: true,
+              callbacks: {
+                title: items => {
+                  const d = dates[items[0].dataIndex];
+                  const isTd = (items[0].dataIndex === todayIdx);
+                  return (isTd ? 'Today  ' : '') + new Date(d + 'T00:00:00').toLocaleDateString('en-IN', { weekday:'short', month:'long', day:'numeric' });
+                },
+                label: item => {
+                  if (item.raw === null || item.raw === undefined) return null;
+                  return '  ' + item.dataset.label + ': ' + round1(item.raw) + ' ' + tab.unit;
+                }
+              }
+            }
+          },
+          scales: {
+            x: { grid: { color: 'rgba(255,255,255,0.05)', drawBorder: false }, ticks: { color: 'rgba(255,255,255,0.5)', font: { size: 10 }, maxRotation: 0, maxTicksLimit: 14 } },
+            y: { position: 'right', grid: { color: 'rgba(255,255,255,0.05)', drawBorder: false }, ticks: { color: 'rgba(255,255,255,0.5)', font: { size: 10 }, callback: v => v + ' ' + tab.unit } }
+          }
+        }
+      });
+
+      setLoading(false);
+      updateLegend(tab, tabKey);
+      await renderDonutAndStats(actual, dates);
+
+    } catch(err) {
+      console.error(err);
+      setLoading(false);
+      const w = document.getElementById('trends-chart-wrap');
+      w.innerHTML = '<div class="trends-error">Could not load data: ' + err.message + '</div>';
+      w.style.display = 'block';
+    }
+  }
+
+  function updateLegend(tab, tabKey) {
+    document.getElementById('leg-actual-line').style.background = tab.actualColor;
+    document.getElementById('leg-actual-label').textContent = tab.label + ' — last 12 months (actual)';
+    const showHist = TR.hasHist && tab.hasHist;
+    document.getElementById('leg-hist-item').style.display  = showHist ? 'flex' : 'none';
+    document.getElementById('leg-no-hist-note').style.display = (!showHist && tabKey === 'humidity') ? 'flex' : 'none';
+    if (showHist && tab.histColor) {
+      document.getElementById('leg-hist-line').style.background =
+        'repeating-linear-gradient(to right,' + tab.histColor + ' 0,' + tab.histColor + ' 6px,transparent 6px,transparent 10px)';
+    }
+  }
+
+  async function renderDonutAndStats(actual, dates) {
+    function avg(arr) { const v = arr.filter(x => x !== null && x !== undefined); return v.length ? round1(v.reduce((a,b)=>a+b,0)/v.length) : null; }
+
+    const actTmax   = avg(actual.daily['temperature_2m_max']);
+    const actTmin   = avg(actual.daily['temperature_2m_min']);
+    const actPrecip = avg(actual.daily['precipitation_sum']);
+    const actWind   = avg(actual.daily['wind_speed_10m_max']);
+    const actHumid  = avg(actual.daily['relative_humidity_2m_mean']);
+
+    let histTmax = null, histTmin = null, histPrecip = null, histWind = null;
+    if (TR.hasHist && TR.histCity) {
+      try {
+        const [ht, htn, hp, hw] = await Promise.all([fetchHist('tmax'), fetchHist('tmin'), fetchHist('precip'), fetchHist('wind')]);
+        histTmax = avg(ht.map(d=>d.value)); histTmin = avg(htn.map(d=>d.value));
+        histPrecip = avg(hp.map(d=>d.value)); histWind = avg(hw.map(d=>d.value));
+      } catch(e) {}
+    }
+
+    const norm = (v, max) => v !== null ? Math.min(100, (v / max) * 100) : 0;
+    const actD   = [norm(actTmax,50), norm(actTmin,30), norm(actPrecip,30), norm(actWind,60)];
+    const histD  = [norm(histTmax,50), norm(histTmin,30), norm(histPrecip,30), norm(histWind,60)];
+    const donutC = ['rgba(251,191,36,0.85)','rgba(251,191,36,0.45)','rgba(96,165,250,0.85)','rgba(52,211,153,0.85)'];
+    const histC  = donutC.map(c => c.replace('0.85)','0.35)').replace('0.45)','0.22)'));
+    const donutLabels = ['Temp Max','Temp Min','Precip','Wind'];
+
+    if (donutChart) { donutChart.destroy(); donutChart = null; }
+    donutChart = new Chart(document.getElementById('trends-donut-chart').getContext('2d'), {
+      type: 'doughnut',
+      data: {
+        labels: donutLabels,
+        datasets: [
+          { label: 'Hist Avg (24yr)', data: (TR.hasHist && TR.histCity) ? histD : actD.map(() => 25), backgroundColor: histC, borderWidth: 2, borderColor: 'rgba(255,255,255,0.04)', hoverOffset: 4 },
+          { label: 'Actual (12mo)',   data: actD, backgroundColor: donutC, borderWidth: 2, borderColor: 'rgba(255,255,255,0.04)', hoverOffset: 4 },
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false, cutout: '52%',
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: item => '  ' + (item.datasetIndex === 0 ? 'Hist avg' : 'Actual') + ' — ' + donutLabels[item.dataIndex] } }
+        }
+      }
+    });
+
+    document.getElementById('donut-center-val').textContent = actTmax !== null ? actTmax + 'C' : '—';
+    document.getElementById('donut-center-sub').textContent = 'Avg Max Temp';
+
+    const rows = [
+      { icon: '&#127777;', label: 'Avg Max Temp',    actual: actTmax,   hist: histTmax,   unit: 'C' },
+      { icon: '&#127777;', label: 'Avg Min Temp',    actual: actTmin,   hist: histTmin,   unit: 'C' },
+      { icon: '&#127783;', label: 'Avg Daily Precip', actual: actPrecip, hist: histPrecip, unit: 'mm' },
+      { icon: '&#128168;', label: 'Avg Wind Speed',  actual: actWind,   hist: histWind,   unit: 'km/h' },
+      { icon: '&#128167;', label: 'Avg Humidity',    actual: actHumid,  hist: null,       unit: '%' },
+    ];
+    document.getElementById('trends-stats-table').innerHTML = rows.map(r =>
+      '<div class="trends-stat-row">' +
+        '<div class="trends-stat-label"><span>' + r.icon + '</span><span>' + r.label + '</span></div>' +
+        '<div class="trends-stat-vals">' +
+          '<span class="trends-stat-val actual">' + (r.actual !== null ? r.actual + ' ' + r.unit : '—') + '</span>' +
+          (TR.hasHist && r.hist !== null
+            ? '<span class="trends-stat-val hist">hist: ' + r.hist + ' ' + r.unit + '</span>'
+            : '<span class="trends-stat-val" style="color:var(--text-dim);font-size:.73rem;">' + (TR.hasHist ? '' : 'no hist data') + '</span>') +
+        '</div>' +
+      '</div>'
+    ).join('');
+  }
+
+  function switchTab(tabKey) {
+    document.querySelectorAll('.trends-tab').forEach(btn => {
+      const active = btn.dataset.tab === tabKey;
+      btn.classList.toggle('trends-tab-active', active);
+      btn.setAttribute('aria-selected', active);
+    });
+    renderTab(tabKey);
+  }
+
+  // Nav search
+  (function() {
+    const input = document.getElementById('nav-search');
+    const drop  = document.getElementById('nav-search-dropdown');
+    if (!input) return;
+    let t;
+    input.addEventListener('input', () => {
+      clearTimeout(t);
+      const q = input.value.trim();
+      if (q.length < 2) { drop.innerHTML = ''; drop.style.display = 'none'; return; }
+      t = setTimeout(async () => {
+        try {
+          const r = await fetch('/api/search?q=' + encodeURIComponent(q));
+          const res = await r.json();
+          if (!res.length) { drop.style.display = 'none'; return; }
+          drop.innerHTML = res.map(c =>
+            '<div class="search-result-item" onclick="location.href=\'/trends?city=' + encodeURIComponent(c.name) + '&lat=' + c.lat + '&lon=' + c.lon + '\'">' +
+            '<span>' + c.name + (c.state ? ', ' + c.state : '') + '</span>' +
+            '<span style="color:var(--text-dim);font-size:.75rem;">' + c.country + '</span></div>'
+          ).join('');
+          drop.style.display = 'block';
+        } catch(e) {}
+      }, 300);
+    });
+    document.addEventListener('click', e => { if (!input.contains(e.target)) drop.style.display = 'none'; });
+  })();
+
+  document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.trends-tab').forEach(btn => btn.addEventListener('click', () => switchTab(btn.dataset.tab)));
+    renderTab('temperature');
+  });
+  </script>
+</body>
+</html>

@@ -710,10 +710,60 @@ def predict_multi():
         raise WeatherException(e, sys)
 
 
-# ── /trends — Historical climate normals API ───────────────────────────────────
+# ── /trends — HTML page ────────────────────────────────────────────────────────
 @app.route("/trends", methods=["GET"])
+def trends_page():
+    """
+    Render the climate trends HTML page for a given city.
+    Resolves the city the same way as /weather; then renders trends.html.
+    Query params: city, lat (optional), lon (optional)
+    """
+    city = request.args.get("city", "Delhi")
+    lat  = request.args.get("lat", None)
+    lon  = request.args.get("lon", None)
+
+    if lat and lon:
+        loc_params = {"lat": lat, "lon": lon, "units": "metric"}
+    else:
+        loc_params = {"q": city, "units": "metric"}
+
+    current = owm_get(f"{OWM_BASE}/weather", {**loc_params})
+    if not current:
+        return render_template(
+            "trends.html",
+            error=f"City '{city}' not found.",
+            city=city, country="",
+            lat=28.6139, lon=77.2090,
+            hist_cities=sorted(HIST_AVG.keys()),
+        )
+
+    city_name  = current.get("name") or city
+    country    = current.get("sys", {}).get("country", "")
+    coord_lat  = current["coord"]["lat"]
+    coord_lon  = current["coord"]["lon"]
+
+    # Check whether this city has historical data (case-insensitive)
+    hist_city = None
+    for k in HIST_AVG:
+        if k.lower() == city_name.lower():
+            hist_city = k
+            break
+
+    return render_template(
+        "trends.html",
+        city=city_name,
+        country=country,
+        lat=coord_lat,
+        lon=coord_lon,
+        hist_city=hist_city,          # matched key in HIST_AVG, or None
+        hist_cities=sorted(HIST_AVG.keys()),
+        has_hist=(hist_city is not None),
+    )
+
+
+# ── /api/trends — Historical climate normals JSON ─────────────────────────────
 @app.route("/api/trends", methods=["GET"])
-def api_trends():
+def api_trends_data():
     """
     Return historical daily averages for a city over a day-of-year window.
 
@@ -742,7 +792,7 @@ def api_trends():
     today_doy = datetime.now(UTC).timetuple().tm_yday
     try:
         doy_start = int(request.args.get("doy_start", today_doy))
-        doy_end   = int(request.args.get("doy_end",   today_doy + 29))
+        doy_end   = int(request.args.get("doy_end",   today_doy + 364))
     except ValueError:
         return jsonify({"error": "doy_start and doy_end must be integers"}), 400
 
