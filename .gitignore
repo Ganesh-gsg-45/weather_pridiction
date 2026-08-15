@@ -26,3 +26,9 @@ Thumbs.db
 
 # Logs
 *.log
+
+# CatBoost auto-generated training logs
+catboost_info/
+
+# pip editable install build artifacts
+*.egg-info/
