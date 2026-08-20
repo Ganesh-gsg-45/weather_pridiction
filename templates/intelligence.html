@@ -1,0 +1,2343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{{ city }}{% if country %}, {{ country }}{% endif %} &mdash; AI Weather Intelligence | GOOD WEATHER</title>
+  <meta name="description" content="Hyperlocal AI Weather Intelligence dashboard for {{ city }}, {{ country }}. Real-time risk analysis, NWS heat index, outdoor activity score, ML rain prediction, and climate trends." />
+  <link rel="icon" type="image/svg+xml" href="/static/images/favicon.svg" />
+  <link rel="stylesheet" href="/static/css/style.css" />
+  <!-- Chart.js 4 -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    /* ═══════════════════════════════════════════════════════════════════════
+       AI WEATHER INTELLIGENCE — UNIFIED DESIGN SYSTEM
+       ═══════════════════════════════════════════════════════════════════════ */
+    :root {
+      --intel-navy-bg: #070d1e;
+      --intel-card-bg: rgba(13, 22, 45, 0.75);
+      --intel-card-border: rgba(255, 255, 255, 0.12);
+      --intel-card-hover: rgba(20, 32, 64, 0.9);
+      --intel-orange: #f59e0b;
+      --intel-orange-glow: rgba(245, 158, 11, 0.35);
+      --intel-cyan: #38bdf8;
+      --intel-blue: #60a5fa;
+      --intel-purple: #c084fc;
+    }
+
+    body.msn-body {
+      background-color: var(--intel-navy-bg);
+      color: #f1f5f9;
+      font-family: 'Inter', sans-serif;
+      min-height: 100vh;
+    }
+
+    .intel-page-wrapper {
+      max-width: 1380px;
+      margin: 0 auto;
+      padding: 1.25rem 1.5rem 3.5rem;
+    }
+
+    /* ── Sticky Top Navbar ──────────────────────────────────────────────── */
+    .intel-top-navbar {
+      position: sticky;
+      top: 1rem;
+      z-index: 500;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1.25rem;
+      padding: 0.75rem 1.25rem;
+      background: rgba(11, 19, 41, 0.88);
+      border: 1px solid var(--intel-card-border);
+      border-radius: var(--radius-lg);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      margin-bottom: 1.5rem;
+      flex-wrap: wrap;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    }
+
+    .intel-brand-group {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .intel-brand-title {
+      font-size: 1.15rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .intel-brand-badge {
+      background: linear-gradient(135deg, rgba(168, 85, 247, 0.25), rgba(6, 182, 212, 0.25));
+      border: 1px solid rgba(168, 85, 247, 0.4);
+      color: var(--intel-purple);
+      font-size: 0.7rem;
+      font-weight: 800;
+      padding: 0.18rem 0.55rem;
+      border-radius: 999px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    /* City Selector Pill */
+    .intel-city-selector-wrap {
+      position: relative;
+      min-width: 200px;
+    }
+    .intel-city-pill {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.6rem;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 999px;
+      padding: 0.45rem 0.95rem;
+      color: #fff;
+      font-size: 0.88rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all var(--transition);
+    }
+    .intel-city-pill:hover {
+      background: rgba(255, 255, 255, 0.12);
+      border-color: rgba(255, 255, 255, 0.28);
+    }
+    .intel-nav-dropdown {
+      position: absolute;
+      top: calc(100% + 8px);
+      left: 0;
+      right: 0;
+      background: #0d162d;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      border-radius: var(--radius-md);
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.7);
+      z-index: 500;
+      max-height: 280px;
+      overflow-y: auto;
+      display: none;
+    }
+    .intel-nav-dropdown.open {
+      display: block;
+    }
+    .intel-nav-dropdown-item {
+      padding: 0.65rem 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      cursor: pointer;
+      font-size: 0.84rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      transition: background var(--transition);
+    }
+    .intel-nav-dropdown-item:hover {
+      background: rgba(56, 189, 248, 0.15);
+    }
+
+    /* ── Main Tab Navigation Bar ────────────────────────────────────────── */
+    .intel-tabs-group {
+      display: flex;
+      align-items: center;
+      background: rgba(0, 0, 0, 0.45);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 999px;
+      padding: 0.25rem 0.35rem;
+      gap: 0.25rem;
+    }
+    .intel-tab-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.45rem 1.15rem;
+      border-radius: 999px;
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 0.84rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all var(--transition);
+      font-family: inherit;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+    .intel-tab-btn:hover {
+      color: #fff;
+      background: rgba(255, 255, 255, 0.08);
+    }
+    .intel-tab-btn.active {
+      background: linear-gradient(135deg, #0284c7, #38bdf8);
+      color: #000;
+      font-weight: 800;
+      box-shadow: 0 2px 12px rgba(56, 189, 248, 0.45);
+    }
+
+    /* View Mode Switcher Pills */
+    .intel-mode-group {
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+      background: rgba(0, 0, 0, 0.35);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 999px;
+      padding: 0.25rem 0.35rem;
+    }
+    .intel-mode-lbl {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      font-weight: 600;
+      padding-left: 0.55rem;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+    .intel-mode-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      padding: 0.35rem 0.75rem;
+      border-radius: 999px;
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 0.76rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all var(--transition);
+      font-family: inherit;
+    }
+    .intel-mode-btn:hover {
+      color: #fff;
+      background: rgba(255, 255, 255, 0.08);
+    }
+    .intel-mode-btn.active {
+      background: rgba(245, 158, 11, 0.25);
+      border: 1px solid rgba(245, 158, 11, 0.5);
+      color: var(--intel-orange);
+      font-weight: 800;
+    }
+
+    /* Right Action Buttons */
+    .intel-nav-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+    }
+    .intel-icon-btn {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      color: #f1f5f9;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all var(--transition);
+      text-decoration: none;
+      font-size: 0.95rem;
+    }
+    .intel-icon-btn:hover {
+      background: rgba(255, 255, 255, 0.16);
+      border-color: rgba(255, 255, 255, 0.3);
+      transform: scale(1.05);
+    }
+
+    /* ── Tab Content Containers ─────────────────────────────────────────── */
+    .intel-tab-pane {
+      display: none;
+      animation: fadeInTab 0.3s ease forwards;
+    }
+    .intel-tab-pane.active {
+      display: block;
+    }
+    @keyframes fadeInTab {
+      from { opacity: 0; transform: translateY(6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════════
+       OVERVIEW TAB STYLES
+       ═══════════════════════════════════════════════════════════════════════ */
+    .intel-hero-card {
+      position: relative;
+      border-radius: var(--radius-xl);
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      border: 1px solid var(--intel-card-border);
+      padding: 0;
+      margin-bottom: 2rem;
+      overflow: hidden;
+      box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55);
+    }
+    .intel-hero-overlay {
+      position: relative;
+      background: linear-gradient(
+        to bottom,
+        rgba(7, 13, 30, 0.45) 0%,
+        rgba(7, 13, 30, 0.82) 55%,
+        rgba(7, 13, 30, 0.98) 100%
+      );
+      padding: 2.25rem 2.5rem;
+      display: grid;
+      grid-template-columns: 1.25fr 1fr;
+      gap: 2rem;
+      align-items: center;
+    }
+    @media (max-width: 900px) {
+      .intel-hero-overlay {
+        grid-template-columns: 1fr;
+        padding: 1.75rem 1.5rem;
+        gap: 1.75rem;
+      }
+    }
+    .intel-hero-location {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-bottom: 0.5rem;
+    }
+    .intel-hero-orange-temp {
+      font-size: 5rem;
+      font-weight: 900;
+      line-height: 0.95;
+      letter-spacing: -0.04em;
+      color: var(--intel-orange);
+      text-shadow: 0 0 45px var(--intel-orange-glow), 0 4px 12px rgba(0,0,0,0.8);
+      display: flex;
+      align-items: baseline;
+      gap: 0.25rem;
+    }
+    .intel-hero-orange-unit {
+      font-size: 2.5rem;
+      font-weight: 700;
+    }
+    .intel-hero-condition-text {
+      font-size: 1.75rem;
+      font-weight: 800;
+      color: #ffffff;
+      margin-top: 0.4rem;
+      text-shadow: 0 2px 8px rgba(0,0,0,0.7);
+      text-transform: capitalize;
+    }
+    .intel-hero-hilo-bar {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      font-size: 0.88rem;
+      color: var(--text-muted);
+      margin-top: 0.5rem;
+      font-weight: 600;
+      flex-wrap: wrap;
+    }
+    .intel-ai-summary-bar {
+      margin-top: 1.25rem;
+      padding: 0.75rem 1.15rem;
+      border-radius: var(--radius-md);
+      background: rgba(14, 165, 233, 0.12);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      display: flex;
+      align-items: flex-start;
+      gap: 0.65rem;
+      font-size: 0.86rem;
+      color: #e0f2fe;
+      line-height: 1.5;
+      backdrop-filter: blur(12px);
+    }
+    .intel-ai-summary-bar strong {
+      color: var(--intel-cyan);
+      white-space: nowrap;
+      font-weight: 800;
+    }
+    .intel-hero-chart-card {
+      background: rgba(10, 18, 38, 0.78);
+      border: 1px solid var(--intel-card-border);
+      border-radius: var(--radius-lg);
+      padding: 1.25rem 1.35rem;
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+    }
+    .intel-hero-chart-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      margin-bottom: 0.85rem;
+      flex-wrap: wrap;
+    }
+    .intel-hero-chart-title {
+      font-size: 0.95rem;
+      font-weight: 800;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .intel-peak-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.25rem 0.7rem;
+      border-radius: var(--radius-sm);
+      background: rgba(245, 158, 11, 0.16);
+      border: 1px solid rgba(245, 158, 11, 0.45);
+      color: var(--intel-orange);
+      font-size: 0.76rem;
+      font-weight: 700;
+    }
+    .intel-short-canvas-wrap {
+      position: relative;
+      height: 160px;
+      width: 100%;
+    }
+
+    /* 5-Card Bento Row */
+    .intel-bento-5col {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr) 1.55fr;
+      gap: 1rem;
+      margin-bottom: 2rem;
+      align-items: stretch;
+    }
+    @media (max-width: 1200px) {
+      .intel-bento-5col { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 680px) {
+      .intel-bento-5col { grid-template-columns: 1fr; }
+    }
+    .intel-risk-card {
+      background: var(--intel-card-bg);
+      border: 1px solid var(--intel-card-border);
+      border-radius: var(--radius-lg);
+      padding: 1.15rem 1.15rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+      position: relative;
+      overflow: hidden;
+      transition: transform var(--transition), border-color var(--transition);
+    }
+    .intel-risk-card:hover {
+      transform: translateY(-3px);
+      border-color: rgba(255, 255, 255, 0.25);
+    }
+    .intel-risk-card-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 0.75rem;
+    }
+    .intel-risk-label {
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .risk-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      padding: 0.2rem 0.6rem;
+      border-radius: 999px;
+      font-size: 0.7rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .risk-badge-low { background: rgba(34, 197, 94, 0.16); border: 1px solid rgba(34, 197, 94, 0.45); color: #4ade80; }
+    .risk-badge-good { background: rgba(132, 204, 22, 0.16); border: 1px solid rgba(132, 204, 22, 0.45); color: #a3e635; }
+    .risk-badge-med { background: rgba(245, 158, 11, 0.16); border: 1px solid rgba(245, 158, 11, 0.45); color: #fbbf24; }
+    .risk-badge-high { background: rgba(249, 115, 22, 0.16); border: 1px solid rgba(249, 115, 22, 0.45); color: #fb923c; }
+    .risk-badge-crit { background: rgba(239, 68, 68, 0.18); border: 1px solid rgba(239, 68, 68, 0.5); color: #f87171; }
+
+    .intel-risk-main-val {
+      font-size: 1.55rem;
+      font-weight: 900;
+      color: #fff;
+      margin-bottom: 0.25rem;
+      line-height: 1.15;
+    }
+    .intel-risk-sub-text {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      line-height: 1.4;
+      margin-bottom: 0.75rem;
+    }
+    .intel-card-thumb-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      padding-top: 0.6rem;
+      font-size: 0.72rem;
+      color: var(--text-dim);
+    }
+    .intel-card-thumb-img {
+      width: 32px;
+      height: 32px;
+      border-radius: var(--radius-sm);
+      object-fit: cover;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+    }
+    .intel-outdoor-meter {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+      margin: 0.35rem 0 0.5rem;
+    }
+    .intel-outdoor-score {
+      font-size: 1.75rem;
+      font-weight: 900;
+      line-height: 1;
+    }
+    .intel-outdoor-bar-bg {
+      flex: 1;
+      height: 7px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.1);
+      overflow: hidden;
+    }
+    .intel-outdoor-bar-fill {
+      height: 100%;
+      border-radius: 999px;
+    }
+
+    /* AI Weather Assistant Panel */
+    .intel-assistant-card {
+      background: linear-gradient(145deg, rgba(20, 30, 60, 0.88) 0%, rgba(13, 22, 45, 0.95) 100%);
+      border: 1px solid rgba(168, 85, 247, 0.35);
+      border-radius: var(--radius-lg);
+      padding: 1.25rem 1.35rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+      position: relative;
+    }
+    @media (max-width: 1200px) { .intel-assistant-card { grid-column: span 2; } }
+    @media (max-width: 680px) { .intel-assistant-card { grid-column: span 1; } }
+
+    .intel-assistant-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.09);
+      padding-bottom: 0.65rem;
+      margin-bottom: 0.75rem;
+    }
+    .intel-assistant-title {
+      font-size: 0.92rem;
+      font-weight: 800;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+    }
+    .intel-assistant-body {
+      font-size: 0.81rem;
+      color: #cbd5e1;
+      line-height: 1.5;
+      margin-bottom: 0.75rem;
+    }
+    .intel-assistant-bullets {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0.45rem;
+    }
+    .intel-assistant-bullet {
+      font-size: 0.78rem;
+      color: #e2e8f0;
+      line-height: 1.45;
+      background: rgba(255, 255, 255, 0.04);
+      border-left: 2px solid var(--intel-cyan);
+      padding: 0.4rem 0.65rem;
+      border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    }
+
+    /* 24-48h Chart Card */
+    .intel-long-chart-card {
+      background: var(--intel-card-bg);
+      border: 1px solid var(--intel-card-border);
+      border-radius: var(--radius-xl);
+      padding: 1.65rem 1.85rem;
+      margin-bottom: 2rem;
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.45);
+      position: relative;
+    }
+    .intel-long-chart-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-bottom: 1.25rem;
+      flex-wrap: wrap;
+    }
+    .intel-long-chart-title {
+      font-size: 1.1rem;
+      font-weight: 800;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .intel-long-chart-desc {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-top: 0.25rem;
+    }
+    .intel-long-canvas-wrap {
+      position: relative;
+      height: 310px;
+      width: 100%;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════════
+       PREDICTION TAB STYLES
+       ═══════════════════════════════════════════════════════════════════════ */
+    .intel-pred-card {
+      background: var(--intel-card-bg);
+      border: 1px solid var(--intel-card-border);
+      border-radius: var(--radius-xl);
+      padding: 2.5rem 2.25rem;
+      margin-bottom: 2rem;
+      box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+      position: relative;
+      overflow: hidden;
+    }
+    .intel-pred-card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: {% if prediction_today and prediction_today.prediction == 'Yes' %}
+        linear-gradient(135deg, rgba(96,165,250,0.08) 0%, transparent 60%)
+      {% else %}
+        linear-gradient(135deg, rgba(245,158,11,0.08) 0%, transparent 60%)
+      {% endif %};
+      pointer-events: none;
+    }
+    .intel-pred-grid {
+      display: grid;
+      grid-template-columns: 1.3fr 1fr;
+      gap: 2.5rem;
+      align-items: center;
+    }
+    @media (max-width: 900px) {
+      .intel-pred-grid { grid-template-columns: 1fr; gap: 1.75rem; }
+    }
+    .intel-pred-headline {
+      font-size: clamp(2rem, 4.5vw, 3.2rem);
+      font-weight: 900;
+      line-height: 1.05;
+      margin-bottom: 0.75rem;
+    }
+    .intel-pred-headline.rain {
+      background: linear-gradient(135deg, #60a5fa 0%, #93c5fd 60%, #bfdbfe 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .intel-pred-headline.no-rain {
+      background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 60%, #fde68a 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .source-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      padding: 0.35rem 0.85rem;
+      border-radius: 999px;
+      font-size: 0.76rem;
+      font-weight: 700;
+      margin-top: 0.5rem;
+    }
+    .source-badge.custom_model {
+      background: rgba(6, 182, 212, 0.14);
+      border: 1px solid rgba(6, 182, 212, 0.4);
+      color: #38bdf8;
+    }
+    .source-badge.owm_forecast {
+      background: rgba(245, 158, 11, 0.14);
+      border: 1px solid rgba(245, 158, 11, 0.38);
+      color: #fbbf24;
+    }
+    .intel-pred-cta-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.6rem;
+      padding: 0.95rem 2rem;
+      border-radius: var(--radius-md);
+      background: linear-gradient(135deg, #f59e0b, #d97706);
+      color: #000;
+      font-weight: 800;
+      font-size: 0.95rem;
+      text-decoration: none;
+      box-shadow: 0 6px 24px rgba(245, 158, 11, 0.38);
+      transition: all var(--transition);
+      margin-top: 1.5rem;
+    }
+    .intel-pred-cta-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 32px rgba(245, 158, 11, 0.55);
+    }
+    .intel-feat-chips {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 0.75rem;
+      margin-top: 1.25rem;
+    }
+    .intel-feat-chip {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: var(--radius-sm);
+      padding: 0.65rem 0.85rem;
+      font-size: 0.78rem;
+    }
+    .intel-feat-chip span { color: var(--text-muted); display: block; margin-bottom: 0.2rem; }
+    .intel-feat-chip strong { color: #fff; font-size: 0.92rem; }
+
+    /* ═══════════════════════════════════════════════════════════════════════
+       TRENDS TAB STYLES
+       ═══════════════════════════════════════════════════════════════════════ */
+    .trends-hero { display:flex; align-items:flex-start; gap:1.25rem; margin-bottom:1.5rem; }
+    .trends-hero-left { flex:1; }
+    .trends-city-label { font-size:1.8rem; font-weight:800; letter-spacing:-0.03em; line-height:1.1; }
+    .trends-subtitle { margin-top:.35rem; font-size:.875rem; color:var(--text-muted); }
+    .trends-subtitle strong { color:var(--intel-orange); }
+    .trends-no-hist-banner {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.85rem 1.25rem;
+      border-radius: var(--radius-md);
+      background: rgba(245, 158, 11, 0.12);
+      border: 1px solid rgba(245, 158, 11, 0.35);
+      color: #fbbf24;
+      font-size: 0.82rem;
+      margin-bottom: 1.5rem;
+      flex-wrap: wrap;
+    }
+    .trends-tab-bar { display:flex; align-items:center; gap:.25rem; background:rgba(0,0,0,0.4); border:1px solid var(--intel-card-border); border-radius:var(--radius-md); padding:.3rem; margin-bottom:1.5rem; overflow-x:auto; }
+    .trends-tab { padding:.45rem 1.1rem; border-radius:var(--radius-sm); border:none; background:transparent; color:var(--text-muted); font-size:.82rem; font-weight:600; cursor:pointer; transition:all var(--transition); white-space:nowrap; font-family:inherit; }
+    .trends-tab:hover { color:var(--text); background:rgba(255,255,255,.06); }
+    .trends-tab.trends-tab-active { background:var(--intel-orange); color:#000; font-weight:800; }
+    .trends-chart-card { background:var(--intel-card-bg); border:1px solid var(--intel-card-border); border-radius:var(--radius-xl); padding:1.5rem 1.75rem; margin-bottom:1.5rem; backdrop-filter:blur(16px); position:relative; overflow:hidden; }
+    .trends-chart-card::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; background:linear-gradient(90deg,var(--tab-color,var(--intel-orange)),transparent); border-radius:var(--radius-xl) var(--radius-xl) 0 0; }
+    .trends-chart-title { font-size:1rem; font-weight:800; margin-bottom:.4rem; }
+    .trends-chart-subtitle { font-size:.78rem; color:var(--text-muted); margin-bottom:1.25rem; }
+    .trends-chart-wrap { position:relative; height:320px; }
+    .trends-chart-wrap canvas { width:100%!important; height:100%!important; }
+    .trends-legend { display:flex; align-items:center; gap:1.5rem; margin-top:1rem; flex-wrap:wrap; }
+    .trends-legend-item { display:flex; align-items:center; gap:.5rem; font-size:.78rem; color:var(--text-muted); }
+    .trends-legend-line { width:32px; height:2px; }
+    .trends-humid-note { display:flex; align-items:flex-start; gap:.6rem; padding:.7rem 1rem; border-radius:var(--radius-sm); background:rgba(56,189,248,.08); border:1px solid rgba(56,189,248,.2); color:rgba(56,189,248,.9); font-size:.78rem; margin-bottom:.85rem; line-height:1.5; }
+    .trends-overview-grid { display:grid; grid-template-columns:300px 1fr; gap:1.5rem; align-items:center; margin-bottom:1.5rem; }
+    @media(max-width:700px) { .trends-overview-grid { grid-template-columns:1fr; } }
+    .trends-donut-wrap { background:var(--intel-card-bg); border:1px solid var(--intel-card-border); border-radius:var(--radius-xl); padding:1.5rem; backdrop-filter:blur(16px); text-align:center; }
+    .trends-donut-title { font-size:.9rem; font-weight:800; margin-bottom:1rem; }
+    .trends-donut-canvas-wrap { position:relative; width:200px; height:200px; margin:0 auto; }
+    .trends-donut-canvas-wrap canvas { width:100%!important; height:100%!important; }
+    .trends-donut-label { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; pointer-events:none; }
+    .trends-donut-label-main { font-size:1.6rem; font-weight:900; line-height:1; }
+    .trends-donut-label-sub { font-size:.7rem; color:var(--text-muted); margin-top:.2rem; }
+    .trends-donut-legend { display:flex; justify-content:center; gap:1.25rem; margin-top:1rem; flex-wrap:wrap; }
+    .trends-donut-leg-item { display:flex; align-items:center; gap:.45rem; font-size:.73rem; color:var(--text-muted); }
+    .trends-donut-leg-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+    .trends-stats-card { background:var(--intel-card-bg); border:1px solid var(--intel-card-border); border-radius:var(--radius-xl); padding:1.5rem 1.75rem; backdrop-filter:blur(16px); }
+    .trends-stats-title { font-size:.9rem; font-weight:800; margin-bottom:1.25rem; }
+    .trends-stat-row { display:flex; align-items:center; justify-content:space-between; padding:.65rem 0; border-bottom:1px solid rgba(255,255,255,0.06); }
+    .trends-stat-row:last-child { border-bottom:none; }
+    .trends-stat-label { display:flex; align-items:center; gap:.5rem; font-size:.82rem; color:var(--text-muted); }
+    .trends-stat-vals { display:flex; align-items:center; gap:1rem; flex-wrap:wrap; justify-content:flex-end; }
+    .trends-stat-val { font-size:.9rem; font-weight:700; }
+    .trends-stat-val.actual { color:#fbbf24; }
+    .trends-stat-val.hist   { color:rgba(96,165,250,.85); font-size:.8rem; font-weight:400; }
+    .trends-loading { display:flex; align-items:center; justify-content:center; gap:.75rem; padding:3rem; color:var(--text-muted); font-size:.85rem; }
+    .trends-spinner { width:20px; height:20px; border:2px solid rgba(255,255,255,.15); border-top-color:var(--intel-orange); border-radius:50%; animation:spin .8s linear infinite; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+    .trends-city-tag { display:inline-block; padding:.2rem .6rem; border-radius:99px; background:rgba(255,255,255,.07); border:1px solid var(--intel-card-border); color:var(--text-muted); font-size:.73rem; text-decoration:none; margin:.15rem; transition:all var(--transition); }
+    .trends-city-tag:hover { background:rgba(245,158,11,.15); border-color:rgba(245,158,11,.4); color:var(--intel-orange); }
+
+    /* ═══════════════════════════════════════════════════════════════════════
+       FOOTER (PERSISTENT ACROSS TABS)
+       ═══════════════════════════════════════════════════════════════════════ */
+    .intel-footer-card {
+      background: rgba(11, 19, 41, 0.85);
+      border: 1px solid var(--intel-card-border);
+      border-radius: var(--radius-xl);
+      padding: 1.75rem 2rem;
+      margin-top: 2rem;
+      margin-bottom: 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 1.5rem;
+    }
+    .intel-footer-about { max-width: 780px; }
+    .intel-footer-about-title {
+      font-size: 0.95rem;
+      font-weight: 800;
+      color: #fff;
+      margin-bottom: 0.35rem;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .intel-footer-about-text {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      line-height: 1.55;
+    }
+    .intel-footer-right { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+    .intel-github-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.45rem 0.95rem;
+      border-radius: var(--radius-sm);
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      color: #fff;
+      text-decoration: none;
+      font-size: 0.82rem;
+      font-weight: 600;
+      transition: all var(--transition);
+    }
+    .intel-github-link:hover {
+      background: rgba(255, 255, 255, 0.16);
+      border-color: rgba(255, 255, 255, 0.35);
+    }
+    .intel-footer-icons { display: flex; align-items: center; gap: 0.45rem; }
+    .intel-footer-icon-btn {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: all var(--transition);
+    }
+    .intel-footer-icon-btn:hover { color: #fff; background: rgba(255, 255, 255, 0.12); }
+  </style>
+</head>
+<body class="msn-body">
+
+  {% if error is defined and error %}
+  <!-- ── Error State ────────────────────────────────────────────────────── -->
+  <div class="intel-page-wrapper" style="padding-top:4rem;">
+    <div class="error-center">
+      <div class="error-icon">🌩</div>
+      <div class="error-title">Location Not Found</div>
+      <p class="error-msg">{{ error }}</p>
+      <a href="/" class="btn-ml" style="margin-top:1rem;">← Return to Search</a>
+    </div>
+  </div>
+
+  {% else %}
+  <div class="intel-page-wrapper" id="intel-root" data-mode="student">
+
+    <!-- ════════════════════════════════════════════════════════════════════
+         1. TOP STICKY NAVBAR (Persists across all tabs)
+         ════════════════════════════════════════════════════════════════════ -->
+    <header class="intel-top-navbar">
+      <!-- Left: Title -->
+      <div class="intel-brand-group">
+        <a href="/" style="text-decoration:none;">
+          <div class="intel-brand-title">
+            <span>⚡ AI Weather Intelligence</span>
+            <span class="intel-brand-badge">Live</span>
+          </div>
+        </a>
+      </div>
+
+      <!-- City Selector with Flag -->
+      <div class="intel-city-selector-wrap">
+        <div class="intel-city-pill" id="city-pill-btn" onclick="toggleCityDropdown()">
+          <span style="display:flex; align-items:center; gap:0.4rem;">
+            <span>{{ country_flag }}</span>
+            <span id="selected-city-text">{{ city }}</span>
+          </span>
+          <span style="font-size:0.75rem; opacity:0.7;">▾</span>
+        </div>
+
+        <div class="intel-nav-dropdown" id="city-nav-dropdown">
+          <div style="padding:0.5rem 0.75rem; border-bottom:1px solid rgba(255,255,255,0.08);">
+            <input
+              type="text"
+              id="intel-search-box-input"
+              placeholder="Search city…"
+              autocomplete="off"
+              style="width:100%; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.15); border-radius:6px; padding:0.35rem 0.65rem; color:#fff; font-size:0.82rem; outline:none;"
+            />
+          </div>
+          <div id="intel-search-results"></div>
+        </div>
+      </div>
+
+      <!-- Main In-Page Tab Navigation (Overview | Prediction | Trends) -->
+      <div class="intel-tabs-group" role="tablist">
+        <button class="intel-tab-btn active" id="tab-btn-overview" onclick="switchTab('overview')" role="tab" aria-selected="true">
+          ☀️ Overview
+        </button>
+        <button class="intel-tab-btn" id="tab-btn-prediction" onclick="switchTab('prediction')" role="tab" aria-selected="false">
+          🤖 Prediction
+        </button>
+        <button class="intel-tab-btn" id="tab-btn-trends" onclick="switchTab('trends')" role="tab" aria-selected="false">
+          📈 Trends
+        </button>
+      </div>
+
+      <!-- View Mode Toggle (Student / Farmer / Event) -->
+      <div class="intel-mode-group">
+        <span class="intel-mode-lbl">Mode:</span>
+        <button class="intel-mode-btn active" id="btn-mode-student" onclick="setViewMode('student')">
+          🎓 Student
+        </button>
+        <button class="intel-mode-btn" id="btn-mode-farmer" onclick="setViewMode('farmer')">
+          🌿 Farmer
+        </button>
+        <button class="intel-mode-btn" id="btn-mode-event" onclick="setViewMode('event')">
+          📅 Event
+        </button>
+      </div>
+
+      <!-- Right: Action Buttons -->
+      <div class="intel-nav-actions">
+        <button class="intel-icon-btn" title="Refresh Live Data" onclick="window.location.reload()">
+          🔄
+        </button>
+        <a href="/" class="intel-icon-btn" title="Back to Search">
+          🔍
+        </a>
+      </div>
+    </header>
+
+
+    <!-- ════════════════════════════════════════════════════════════════════
+         TAB 1: OVERVIEW TAB (Hero, Risk Cards, AI Assistant, Hourly, AQI, Sun-Moon, 48h)
+         ════════════════════════════════════════════════════════════════════ -->
+    <main class="intel-tab-pane active" id="pane-overview">
+
+      <!-- Hero Section -->
+      <section class="intel-hero-card" style="background-image: url('{{ condition_image.hero }}');">
+        <div class="intel-hero-overlay">
+          <!-- Left: Glowing Orange Temp, Condition & AI Summary -->
+          <div>
+            <div class="intel-hero-location">
+              <span>📍</span> <strong>{{ city }}, {{ country }}</strong> &nbsp;·&nbsp; <span>{{ last_updated }}</span>
+            </div>
+
+            <div class="intel-hero-orange-temp">
+              {{ temp }}<span class="intel-hero-orange-unit">°C</span>
+            </div>
+
+            <div class="intel-hero-condition-text">
+              {{ description }}
+            </div>
+
+            <div class="intel-hero-hilo-bar">
+              <span>Feels like <strong>{{ feels_like }}°C</strong></span>
+              <span>▲ {{ today_high }}°</span>
+              <span>▼ {{ today_low }}°</span>
+              <span>💧 Humidity {{ humidity }}%</span>
+              <span>💨 {{ wind_speed }} km/h {{ wind_dir }}</span>
+            </div>
+
+            <!-- AI Summary Callout -->
+            <div class="intel-ai-summary-bar">
+              <span>🤖</span>
+              <div>
+                <strong>AI Summary:</strong> {{ ai_content.summary_line }}
+              </div>
+            </div>
+          </div>
+
+          <!-- Right: Short-Term Forecast Bar Chart ("Short-Term Outlook 3-Hour Slots") -->
+          <div class="intel-hero-chart-card">
+            <div class="intel-hero-chart-header">
+              <div class="intel-hero-chart-title">
+                <span>⏱ Short-Term Outlook (3-Hour Slots)</span>
+              </div>
+              <div class="intel-peak-badge" id="short-peak-badge">
+                <span>🌧</span> Peak Rain: {{ peak_short_pop }}% at {{ peak_short_time }}
+              </div>
+            </div>
+
+            <div class="intel-short-canvas-wrap">
+              <canvas id="shortTermChart"></canvas>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 5-Card Bento Row (4 Risk Cards + AI Weather Assistant Panel) -->
+      <section class="intel-bento-5col">
+        <!-- Card 1: Rain Risk -->
+        <div class="intel-risk-card" style="border-top: 3px solid {{ rain_risk.color }};">
+          <div>
+            <div class="intel-risk-card-head">
+              <div class="intel-risk-label">🌧 Rain Risk</div>
+              <span class="risk-badge {{ rain_risk.badge_class }}">{{ rain_risk.tier }}</span>
+            </div>
+            <div class="intel-risk-main-val">{{ rain_risk.pop_pct }}%</div>
+            <div class="intel-risk-sub-text">{{ rain_risk.text }}</div>
+          </div>
+          <div class="intel-card-thumb-row">
+            <span>{{ rain_risk.peak_note }}</span>
+            <img src="{{ condition_image.thumb }}" alt="Rain radar thumbnail" class="intel-card-thumb-img" />
+          </div>
+        </div>
+
+        <!-- Card 2: Thunderstorm Risk -->
+        <div class="intel-risk-card" style="border-top: 3px solid {{ thunderstorm_risk.color }};">
+          <div>
+            <div class="intel-risk-card-head">
+              <div class="intel-risk-label">⚡ Thunderstorm</div>
+              <span class="risk-badge {{ thunderstorm_risk.badge_class }}">{{ thunderstorm_risk.tier }}</span>
+            </div>
+            <div class="intel-risk-main-val" style="font-size:1.25rem; color:{{ thunderstorm_risk.color }};">
+              {{ thunderstorm_risk.text }}
+            </div>
+            <div class="intel-risk-sub-text">{{ thunderstorm_risk.detail }}</div>
+          </div>
+          <div class="intel-card-thumb-row">
+            <span>OWM Code: {{ weather_id }}</span>
+            <img src="https://images.unsplash.com/photo-1605727216801-e27ce1d0cc28?auto=format&fit=crop&w=120&q=80" alt="Storm lightning thumbnail" class="intel-card-thumb-img" />
+          </div>
+        </div>
+
+        <!-- Card 3: Heat Stress -->
+        <div class="intel-risk-card" style="border-top: 3px solid {{ heat_stress.color }};">
+          <div>
+            <div class="intel-risk-card-head">
+              <div class="intel-risk-label">🔥 Heat Stress</div>
+              <span class="risk-badge {{ heat_stress.badge_class }}">{{ heat_stress.tier }}</span>
+            </div>
+            <div class="intel-risk-main-val">
+              {{ heat_stress.heat_index_c }}°C
+            </div>
+            <div class="intel-risk-sub-text">
+              <strong>{{ heat_stress.desc }}</strong> (Humidity {{ humidity }}%).
+            </div>
+          </div>
+          <div class="intel-card-thumb-row">
+            <span>⚠️ NWS Rothfusz Index</span>
+            <img src="https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=120&q=80" alt="Heat sun thumbnail" class="intel-card-thumb-img" />
+          </div>
+        </div>
+
+        <!-- Card 4: Outdoor Activity Score -->
+        <div class="intel-risk-card" style="border-top: 3px solid {{ outdoor_activity.color }};">
+          <div>
+            <div class="intel-risk-card-head">
+              <div class="intel-risk-label">🏃 Outdoor Score</div>
+              <span class="risk-badge {{ outdoor_activity.badge_class }}">{{ outdoor_activity.rating }}</span>
+            </div>
+            <div class="intel-outdoor-meter">
+              <div class="intel-outdoor-score" style="color:{{ outdoor_activity.color }};">
+                {{ outdoor_activity.score }}<span style="font-size:0.9rem; color:var(--text-muted);">/100</span>
+              </div>
+              <div class="intel-outdoor-bar-bg">
+                <div class="intel-outdoor-bar-fill" style="width:{{ outdoor_activity.score }}%; background:{{ outdoor_activity.color }};"></div>
+              </div>
+            </div>
+            <div class="intel-risk-sub-text">{{ outdoor_activity.summary }}</div>
+          </div>
+          <div class="intel-card-thumb-row">
+            <span>⚖️ Weighted Index</span>
+            <span style="font-weight:700; color:{{ outdoor_activity.color }};">{{ outdoor_activity.rating }}</span>
+          </div>
+        </div>
+
+        <!-- Card 5: AI Weather Assistant Panel -->
+        <div class="intel-assistant-card" id="ai-assistant-panel">
+          <div class="intel-assistant-header">
+            <div class="intel-assistant-title">
+              <span>💬 AI Weather Assistant</span>
+            </div>
+            <button class="intel-assistant-close" title="Dismiss" onclick="document.getElementById('ai-assistant-panel').style.opacity='0.4'">✕</button>
+          </div>
+
+          <div class="intel-assistant-body">
+            {{ ai_content.assistant_body }}
+          </div>
+
+          <!-- Student Mode Bullets -->
+          <ul class="intel-assistant-bullets" id="bullets-student">
+            {% for tip in ai_content.tips_student %}
+            <li class="intel-assistant-bullet">{{ tip }}</li>
+            {% endfor %}
+          </ul>
+
+          <!-- Farmer Mode Bullets -->
+          <ul class="intel-assistant-bullets" id="bullets-farmer" style="display:none;">
+            {% for tip in ai_content.tips_farmer %}
+            <li class="intel-assistant-bullet" style="border-left-color:#84cc16;">{{ tip }}</li>
+            {% endfor %}
+          </ul>
+
+          <!-- Event Mode Bullets -->
+          <ul class="intel-assistant-bullets" id="bullets-event" style="display:none;">
+            {% for tip in ai_content.tips_event %}
+            <li class="intel-assistant-bullet" style="border-left-color:#f59e0b;">{{ tip }}</li>
+            {% endfor %}
+          </ul>
+        </div>
+      </section>
+
+      <!-- ── Reused: 7-Day Strip + 6-Tab Hourly Widget (from weather.html) ────── -->
+      <section class="msn-section fade-in-up" id="hourly-section" style="margin-bottom: 2rem;">
+        <!-- 7-Day Day Strip -->
+        <div class="hw-day-strip" id="hw-day-strip">
+          {% for d in daily %}
+          <div class="hw-day-card {% if d.is_today %}hw-day-today{% endif %}">
+            <div class="hw-day-num">
+              {% set parts = d.date.split('-') %}{{ parts[2]|int }}
+            </div>
+            <div class="hw-day-name">
+              {% if d.is_today %}Today
+              {% elif loop.index == 2 %}Tomorrow
+              {% else %}
+                {% set wdays = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'] %}
+                {% set ymd = d.date.split('-') %}
+                {% set wd = (ymd[0]|int * 365 + ymd[1]|int * 31 + ymd[2]|int) % 7 %}
+                {{ wdays[wd] }}
+              {% endif %}
+            </div>
+            <div class="hw-day-icon">
+              {% if d.icon_class == "sun" %}☀️
+              {% elif d.icon_class == "moon" %}🌙
+              {% elif d.icon_class == "partly-cloudy" %}⛅
+              {% elif d.icon_class == "partly-cloudy-night" %}🌤
+              {% elif d.icon_class == "cloudy" %}🌥
+              {% elif d.icon_class == "overcast" %}☁️
+              {% elif d.icon_class == "rain" %}🌧
+              {% elif d.icon_class == "rain-sun" %}🌦
+              {% elif d.icon_class == "thunder" %}⛈
+              {% elif d.icon_class == "snow" %}❄️
+              {% elif d.icon_class == "fog" %}🌫
+              {% else %}🌤{% endif %}
+            </div>
+            <div class="hw-day-hi">{{ d.high }}°</div>
+            <div class="hw-day-lo">{{ d.low }}°</div>
+          </div>
+          {% endfor %}
+        </div>
+
+        <!-- 6-Tab Bar + Chart/List Toggle -->
+        <div class="hw-tab-bar">
+          <div class="hw-tabs" role="tablist">
+            <button class="hw-tab hw-tab-active" data-tab="overview"     role="tab" aria-selected="true">Overview</button>
+            <button class="hw-tab"               data-tab="precip"       role="tab">Precipitation</button>
+            <button class="hw-tab"               data-tab="wind"         role="tab">Wind</button>
+            <button class="hw-tab"               data-tab="aqi"          role="tab">Air Quality</button>
+            <button class="hw-tab"               data-tab="humidity"     role="tab">Humidity</button>
+            <button class="hw-tab"               data-tab="clouds"       role="tab">Cloud Cover</button>
+          </div>
+          <div class="hw-view-toggle">
+            <button class="hw-toggle-btn hw-toggle-active" id="hw-btn-chart" onclick="hwSetView('chart')">📈 Chart</button>
+            <button class="hw-toggle-btn"                  id="hw-btn-list"  onclick="hwSetView('list')">☰ List</button>
+          </div>
+        </div>
+
+        <!-- CHART VIEW -->
+        <div id="hw-chart-view">
+          <div class="hw-slot-row" id="hw-slot-row">
+            {% for h in hourly %}
+            <div class="hw-slot-cell" data-idx="{{ loop.index0 }}">
+              <div class="hw-slot-time">{{ h.time }}</div>
+              <div class="hw-slot-icon">
+                {% if h.icon_class == "sun" %}☀️
+                {% elif h.icon_class == "moon" %}🌙
+                {% elif h.icon_class == "partly-cloudy" %}⛅
+                {% elif h.icon_class == "partly-cloudy-night" %}🌤
+                {% elif h.icon_class == "cloudy" %}🌥
+                {% elif h.icon_class == "overcast" %}☁️
+                {% elif h.icon_class == "rain" %}🌧
+                {% elif h.icon_class == "rain-sun" %}🌦
+                {% elif h.icon_class == "thunder" %}⛈
+                {% elif h.icon_class == "snow" %}❄️
+                {% elif h.icon_class == "fog" %}🌫
+                {% else %}🌤{% endif %}
+              </div>
+              <div class="hw-slot-val" id="hw-sv-{{ loop.index0 }}">{{ h.temp }}°</div>
+            </div>
+            {% endfor %}
+          </div>
+
+          <div class="hw-chart-wrap">
+            <canvas id="hw-chart" height="160"></canvas>
+            <div class="hw-sun-pin" id="hw-sunrise-pin" title="Sunrise">🌅</div>
+            <div class="hw-sun-pin" id="hw-sunset-pin"  title="Sunset">🌇</div>
+          </div>
+
+          <!-- Bottom Precipitation Intensity Strip -->
+          <div class="hw-precip-strip" id="hw-precip-strip">
+            {% for h in hourly %}
+            {% set p = h.precip %}
+            {% if p == 0 %}
+              {% set col = "rgba(255,255,255,0.04)" %}
+            {% elif p < 20 %}
+              {% set col = "rgba(96,165,250,0.18)" %}
+            {% elif p < 40 %}
+              {% set col = "rgba(59,130,246,0.35)" %}
+            {% elif p < 60 %}
+              {% set col = "rgba(37,99,235,0.50)" %}
+            {% elif p < 80 %}
+              {% set col = "rgba(29,78,216,0.65)" %}
+            {% else %}
+              {% set col = "rgba(30,58,138,0.85)" %}
+            {% endif %}
+            <div class="hw-precip-seg" style="background:{{ col }};"
+                 title="{{ h.time }}: {{ p }}% precipitation">
+              {% if p > 0 %}<span class="hw-precip-pct">{{ p }}%</span>{% endif %}
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+
+        <!-- LIST VIEW -->
+        <div id="hw-list-view" style="display:none;">
+          <div class="hw-list-table">
+            <div class="hw-list-header">
+              <span>Time</span><span>Condition</span>
+              <span id="hw-list-col-label">Temp</span>
+              <span>Precip</span>
+            </div>
+            {% for h in hourly %}
+            <div class="hw-list-row">
+              <span class="hw-list-time">{{ h.time }}</span>
+              <span class="hw-list-icon">
+                {% if h.icon_class == "sun" %}☀️
+                {% elif h.icon_class == "moon" %}🌙
+                {% elif h.icon_class == "partly-cloudy" %}⛅
+                {% elif h.icon_class == "cloudy" %}🌥
+                {% elif h.icon_class == "overcast" %}☁️
+                {% elif h.icon_class == "rain" %}🌧
+                {% elif h.icon_class == "rain-sun" %}🌦
+                {% elif h.icon_class == "thunder" %}⛈
+                {% elif h.icon_class == "snow" %}❄️
+                {% elif h.icon_class == "fog" %}🌫
+                {% else %}🌤{% endif %}
+                <span style="font-size:0.72rem;color:var(--text-muted);">{{ h.desc }}</span>
+              </span>
+              <span class="hw-list-val"
+                    data-temp="{{ h.temp }}"
+                    data-precip="{{ h.precip }}"
+                    data-wind="{{ h.wind_speed }}"
+                    data-humidity="{{ h.humidity }}"
+                    data-clouds="{{ h.clouds }}"
+                    data-aqi="{{ aqi_index }}">{{ h.temp }}°C</span>
+              <span class="hw-list-precip">{% if h.precip > 0 %}💧{{ h.precip }}%{% else %}—{% endif %}</span>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+
+        <!-- No Alerts Bar -->
+        <div class="hw-alerts-bar">
+          <span class="hw-alerts-icon">🔔</span>
+          <span>No active severe weather alerts for {{ city }}</span>
+        </div>
+      </section>
+
+      <!-- ── Reused: Air Quality & Sun-Moon (Side-by-Side from weather.html) ───── -->
+      <div class="msn-two-col fade-in-up" style="margin-bottom: 2rem;">
+        <!-- Air Quality Card -->
+        <section class="msn-card" id="aqi-section">
+          <div class="msn-section-title">🌿 Air Quality Index</div>
+          <div class="msn-aqi-hero">
+            <div class="msn-aqi-badge" style="background: {{ aqi_color }}22; border-color: {{ aqi_color }}55; color: {{ aqi_color }};">
+              <span class="msn-aqi-num">{{ aqi_index }}</span>
+              <span class="msn-aqi-lbl">{{ aqi_text }}</span>
+            </div>
+            <div class="msn-aqi-scale">
+              <div class="msn-aqi-bar">
+                <div class="msn-aqi-thumb" style="left: {{ ((aqi_index - 1) / 4 * 100)|int }}%;"></div>
+              </div>
+              <div class="msn-aqi-scale-labels">
+                <span>Good</span><span>Fair</span><span>Moderate</span><span>Poor</span><span>V.Poor</span>
+              </div>
+            </div>
+          </div>
+          {% if aqi_components %}
+          <div class="msn-pollutants">
+            <div class="msn-pollutant-item">
+              <span class="msn-poll-name">PM<sub>2.5</sub></span>
+              <span class="msn-poll-val">{{ "%.1f"|format(aqi_components.get('pm2_5', 0)) }} μg/m³</span>
+            </div>
+            <div class="msn-pollutant-item">
+              <span class="msn-poll-name">PM<sub>10</sub></span>
+              <span class="msn-poll-val">{{ "%.1f"|format(aqi_components.get('pm10', 0)) }} μg/m³</span>
+            </div>
+            <div class="msn-pollutant-item">
+              <span class="msn-poll-name">O<sub>3</sub></span>
+              <span class="msn-poll-val">{{ "%.1f"|format(aqi_components.get('o3', 0)) }} μg/m³</span>
+            </div>
+          </div>
+          {% endif %}
+        </section>
+
+        <!-- Sun & Moon Card -->
+        <section class="msn-card" id="sunmoon-section">
+          <div class="msn-section-title">🌅 Sun &amp; Moon</div>
+          <div class="msn-sun-arc-wrap">
+            <svg viewBox="0 0 200 110" class="msn-sun-svg" aria-hidden="true">
+              <path d="M 10 100 A 90 90 0 0 1 190 100"
+                    fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="2" stroke-dasharray="5 4"/>
+              <path id="sun-arc-active" d="M 10 100 A 90 90 0 0 1 190 100"
+                    fill="none" stroke="#fbbf24" stroke-width="2.5"
+                    stroke-dasharray="0 283" stroke-linecap="round"/>
+              <circle id="sun-ball" cx="10" cy="100" r="7"
+                      fill="#fbbf24" filter="drop-shadow(0 0 6px rgba(251,191,36,0.8))"/>
+            </svg>
+            <div class="msn-sun-times">
+              <div class="msn-sun-item">
+                <span class="msn-sun-icon">🌅</span>
+                <div>
+                  <div class="msn-sun-time" id="sunrise-time">--:--</div>
+                  <div class="msn-sun-label">Sunrise</div>
+                </div>
+              </div>
+              <div class="msn-sun-item" style="text-align:right;">
+                <span class="msn-sun-icon">🌇</span>
+                <div>
+                  <div class="msn-sun-time" id="sunset-time">--:--</div>
+                  <div class="msn-sun-label">Sunset</div>
+                </div>
+              </div>
+            </div>
+            <div class="msn-day-length">Day Length: <span id="day-length">--h --m</span></div>
+          </div>
+
+          <div class="msn-moon-strip">
+            <span class="msn-moon-icon">{{ moon.icon }}</span>
+            <div>
+              <div class="msn-moon-name">{{ moon.name }}</div>
+              <div class="msn-moon-illum">{{ moon.illumination }}% Illumination</div>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <!-- 24-48 Hour Dual Axis Chart -->
+      <section class="intel-long-chart-card">
+        <div class="intel-long-chart-header">
+          <div>
+            <div class="intel-long-chart-title">
+              <span>📈 24–48 Hour Forecast Trajectory</span>
+            </div>
+            <div class="intel-long-chart-desc">
+              Dual-axis temperature (°C, left axis) &amp; precipitation probability (%, right axis)
+            </div>
+          </div>
+          <div class="intel-peak-badge" id="long-peak-badge" style="background:rgba(56,189,248,0.14); border-color:rgba(56,189,248,0.4); color:#38bdf8;">
+            <span>🌧</span> Peak Rain: {{ peak_48h_pop }}% at {{ peak_48h_time }}
+          </div>
+        </div>
+
+        <div class="intel-long-canvas-wrap">
+          <canvas id="longTermChart"></canvas>
+        </div>
+      </section>
+    </main>
+
+
+    <!-- ════════════════════════════════════════════════════════════════════
+         TAB 2: PREDICTION TAB (Today's ML Rain Prediction + CTA to /predict-form)
+         ════════════════════════════════════════════════════════════════════ -->
+    <main class="intel-tab-pane" id="pane-prediction">
+      <section class="intel-pred-card">
+        <div class="intel-pred-grid">
+          <!-- Left: Prediction Statement & Badges -->
+          <div>
+            <div style="font-size:0.75rem; font-weight:800; letter-spacing:0.12em; text-transform:uppercase; color:var(--text-muted); margin-bottom:0.5rem;">
+              🤖 ML Rain Forecast &bull; {{ today_str }}
+            </div>
+
+            <div class="intel-pred-headline {% if prediction_today.prediction == 'Yes' %}rain{% else %}no-rain{% endif %}">
+              {% if prediction_today.prediction == 'Yes' %}
+                Rain Expected
+              {% else %}
+                No Rain Expected
+              {% endif %}
+            </div>
+
+            <div style="display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap; margin-bottom:1rem;">
+              <span class="risk-badge" style="background:{{ prediction_today.risk_bg }}; border:1px solid {{ prediction_today.risk_border }}; color:{{ prediction_today.risk_color }}; font-size:0.82rem; padding:0.35rem 0.95rem;">
+                {{ prediction_today.risk_level }} Risk
+              </span>
+
+              <span class="source-badge {{ prediction_today.prediction_source }}">
+                {% if prediction_today.prediction_source == 'custom_model' %}
+                  🤖 {{ prediction_today.source_label }}
+                {% else %}
+                  🌐 {{ prediction_today.source_label }}
+                {% endif %}
+              </span>
+            </div>
+
+            <p style="font-size:0.92rem; color:var(--text-muted); line-height:1.6; max-width:540px;">
+              Our AI inference model calculates a <strong>{{ prediction_today.probability }}%</strong> probability of precipitation for <strong>{{ city }}</strong> today with <strong>{{ prediction_today.confidence }}%</strong> model confidence based on real-time atmospheric metrics.
+            </p>
+
+            <a href="/predict-form?city={{ city }}" class="intel-pred-cta-btn">
+              <span>⚡ Get Full 5-Day Forecast &amp; Custom Predictions</span>
+              <span>→</span>
+            </a>
+          </div>
+
+          <!-- Right: Key Weather Feature Chips -->
+          <div>
+            <div style="font-size:0.82rem; font-weight:800; color:#fff; margin-bottom:0.65rem;">
+              📊 Input Meteorological Features (Derived Live)
+            </div>
+            <div class="intel-feat-chips">
+              <div class="intel-feat-chip">
+                <span>Max / Min Temp</span>
+                <strong>{{ today_high }}°C / {{ today_low }}°C</strong>
+              </div>
+              <div class="intel-feat-chip">
+                <span>Rain Probability</span>
+                <strong style="color:{{ prediction_today.risk_color }};">{{ prediction_today.probability }}%</strong>
+              </div>
+              <div class="intel-feat-chip">
+                <span>Wind Speed</span>
+                <strong>{{ wind_speed }} km/h</strong>
+              </div>
+              <div class="intel-feat-chip">
+                <span>Humidity</span>
+                <strong>{{ humidity }}%</strong>
+              </div>
+              <div class="intel-feat-chip">
+                <span>Pressure</span>
+                <strong>{{ pressure }} hPa</strong>
+              </div>
+              <div class="intel-feat-chip">
+                <span>Nearest ML Station</span>
+                <strong>{{ nearest_city or 'Delhi' }}</strong>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+
+    <!-- ════════════════════════════════════════════════════════════════════
+         TAB 3: TRENDS TAB (4-Tab Historical/Actual Chart + Donut + Stats)
+         ════════════════════════════════════════════════════════════════════ -->
+    <main class="intel-tab-pane" id="pane-trends">
+      <!-- Trends Hero Header -->
+      <div class="trends-hero">
+        <div class="trends-hero-left">
+          <div class="trends-city-label">📊 {{ city }}{% if country %}, {{ country }}{% endif %}</div>
+          <div class="trends-subtitle">
+            Climate Trends &nbsp;&middot;&nbsp; Last 12 months actual data vs
+            {% if has_hist %}
+            <strong>24-year historical average (2000&ndash;2024)</strong>
+            {% else %}
+            historical avg <em style="color:var(--text-dim);">(not available for this city)</em>
+            {% endif %}
+          </div>
+          {% if not has_hist %}
+          <div style="font-size:0.75rem; color:var(--text-dim); margin-top:0.4rem;">
+            24-year historical averages available for:
+            {% for c in hist_cities %}
+            <a class="trends-city-tag" href="/intelligence?city={{ c }}#trends">{{ c }}</a>
+            {% endfor %}
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+      {% if not has_hist %}
+      <div class="trends-no-hist-banner">
+        ⚠️ &nbsp;No 24-year historical dataset for <strong>{{ city }}</strong>. Showing last-12-months actual data from Open-Meteo.
+      </div>
+      {% endif %}
+
+      <!-- Trends Tab Bar (Temperature / Precipitation / Humidity / Wind) -->
+      <div class="trends-tab-bar" role="tablist" id="trends-tab-bar">
+        <button class="trends-tab trends-tab-active" data-tab="temperature"   onclick="renderTrendsMetric('temperature')" role="tab" aria-selected="true"  id="ttab-temperature">🌡️ Temperature</button>
+        <button class="trends-tab"                   data-tab="precipitation" onclick="renderTrendsMetric('precipitation')" role="tab" aria-selected="false" id="ttab-precipitation">🌧️ Precipitation</button>
+        <button class="trends-tab"                   data-tab="humidity"      onclick="renderTrendsMetric('humidity')" role="tab" aria-selected="false" id="ttab-humidity">💧 Humidity</button>
+        <button class="trends-tab"                   data-tab="wind"          onclick="renderTrendsMetric('wind')" role="tab" aria-selected="false" id="ttab-wind">💨 Wind</button>
+      </div>
+
+      <!-- Trends Main Chart Card -->
+      <div class="trends-chart-card" id="trends-chart-card">
+        <div class="trends-chart-title"    id="trends-chart-title">Temperature &mdash; Last 12 months</div>
+        <div class="trends-chart-subtitle" id="trends-chart-subtitle">Daily max &amp; min temperature (&deg;C)</div>
+
+        <div class="trends-humid-note" id="trends-humid-note" style="display:none;">
+          ℹ️ &nbsp;Humidity data is sourced from Open-Meteo (daily mean, last 12 months). A 24-year historical average is not in the training baseline &mdash; actual line is shown.
+        </div>
+
+        <div class="trends-loading" id="trends-loading">
+          <div class="trends-spinner"></div>
+          Loading climate data from Open-Meteo&hellip;
+        </div>
+
+        <div class="trends-chart-wrap" id="trends-chart-wrap" style="display:none;">
+          <canvas id="trends-main-chart"></canvas>
+        </div>
+
+        <div class="trends-legend" id="trends-legend" style="display:none;">
+          <div class="trends-legend-item">
+            <div class="trends-legend-line" id="leg-actual-line" style="background:#fbbf24;"></div>
+            <span id="leg-actual-label">Last 12 months (actual)</span>
+          </div>
+          <div class="trends-legend-item" id="leg-hist-item" style="{% if not has_hist %}display:none;{% endif %}">
+            <div class="trends-legend-line" id="leg-hist-line" style="background:repeating-linear-gradient(to right,rgba(96,165,250,0.85) 0,rgba(96,165,250,0.85) 6px,transparent 6px,transparent 10px);"></div>
+            <span>24-yr historical avg (2000&ndash;2024)</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Donut + Annual Stats Summary -->
+      <div class="trends-overview-grid">
+        <div class="trends-donut-wrap">
+          <div class="trends-donut-title">Weather Overview</div>
+          <div class="trends-donut-canvas-wrap">
+            <canvas id="trends-donut-chart"></canvas>
+            <div class="trends-donut-label">
+              <div class="trends-donut-label-main" id="donut-center-val">&mdash;</div>
+              <div class="trends-donut-label-sub"  id="donut-center-sub">Annual Avg</div>
+            </div>
+          </div>
+          <div class="trends-donut-legend">
+            <div class="trends-donut-leg-item">
+              <div class="trends-donut-leg-dot" style="background:#fbbf24;"></div>
+              Actual (12 mo)
+            </div>
+            {% if has_hist %}
+            <div class="trends-donut-leg-item">
+              <div class="trends-donut-leg-dot" style="background:rgba(96,165,250,0.7);"></div>
+              Hist avg (24 yr)
+            </div>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="trends-stats-card">
+          <div class="trends-stats-title">📈 Annual Summary &mdash; {{ city }}</div>
+          <div id="trends-stats-table">
+            <div class="trends-loading" style="padding:1.5rem;">
+              <div class="trends-spinner"></div>&nbsp;Loading summary&hellip;
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+
+    <!-- ════════════════════════════════════════════════════════════════════
+         5. PERSISTENT FOOTER (About dashboard + Open Source links)
+         ════════════════════════════════════════════════════════════════════ -->
+    <footer class="intel-footer-card">
+      <div class="intel-footer-about">
+        <div class="intel-footer-about-title">
+          <span>ℹ️ About this dashboard</span>
+        </div>
+        <p class="intel-footer-about-text">
+          AI-powered weather intelligence dashboard providing hyperlocal forecasts, risk assessments, and machine learning predictions. Live data sourced from OpenWeatherMap &amp; Open-Meteo. Multi-persona intelligence summaries generated using Google Gemini.
+        </p>
+      </div>
+
+      <div class="intel-footer-right">
+        <a href="https://github.com" target="_blank" rel="noopener" class="intel-github-link">
+          <span>🐙</span> GitHub Open Source
+        </a>
+        <div class="intel-footer-icons">
+          <button class="intel-footer-icon-btn" title="Settings">⚙️</button>
+          <button class="intel-footer-icon-btn" title="Notifications">🔔</button>
+          <button class="intel-footer-icon-btn" title="Share">↗️</button>
+        </div>
+      </div>
+    </footer>
+
+  </div><!-- /intel-page-wrapper -->
+  {% endif %}
+
+  <!-- ════════════════════════════════════════════════════════════════════
+       CLIENT JAVASCRIPT: TABS, DEEP-LINKING, CHARTS, SUN ARC, SEARCH
+       ════════════════════════════════════════════════════════════════════ -->
+  <script>
+  'use strict';
+
+  // Server-injected data constants
+  const SHORT_SLOTS = [
+    {% for s in short_term_slots %}
+    {
+      time: "{{ s.time_label }}",
+      fullTime: "{{ s.full_time_label }}",
+      pop: {{ s.pop_pct }},
+      temp: {{ s.temp }},
+      desc: "{{ s.desc }}"
+    }{% if not loop.last %},{% endif %}
+    {% endfor %}
+  ];
+
+  const HOURLY_48H = [
+    {% for h in hourly_48h %}
+    {
+      time: "{{ h.time_label }}",
+      hour: "{{ h.hour_label }}",
+      temp: {{ h.temp }},
+      feels: {{ h.feels_like }},
+      pop: {{ h.pop_pct }},
+      desc: "{{ h.desc }}"
+    }{% if not loop.last %},{% endif %}
+    {% endfor %}
+  ];
+
+  const HOURLY_MSN = [
+    {% for h in hourly %}
+    {
+      time: "{{ h.time }}",
+      temp: {{ h.temp }},
+      precip: {{ h.precip }},
+      wind: {{ h.wind_speed }},
+      humidity: {{ h.humidity }},
+      clouds: {{ h.clouds }},
+      desc: "{{ h.desc }}"
+    }{% if not loop.last %},{% endif %}
+    {% endfor %}
+  ];
+
+  const SUN_TIMES = {
+    sunrise: {{ sunrise_ts | default(0) }},
+    sunset:  {{ sunset_ts  | default(0) }},
+    tz:      {{ timezone   | default(0) }}
+  };
+
+  const TR = {
+    city:     "{{ city | e }}",
+    country:  "{{ country | e }}",
+    lat:      {{ lat | default(28.6139) }},
+    lon:      {{ lon | default(77.2090) }},
+    histCity: {{ ('"%s"' % hist_city) | safe if (hist_city is defined and hist_city) else 'null' }},
+    hasHist:  {{ 'true' if (has_hist is defined and has_hist) else 'false' }},
+  };
+
+  // Global Chart.js configuration
+  Chart.defaults.color = 'rgba(240, 244, 248, 0.65)';
+  Chart.defaults.font.family = "'Inter', sans-serif";
+  Chart.defaults.borderColor = 'rgba(255, 255, 255, 0.08)';
+
+  // ── 1. IN-PAGE TAB NAVIGATION & DEEP-LINKING ──────────────────────────────
+  let activeTabName = 'overview';
+  let chartsInitialized = {
+    overview: false,
+    prediction: false,
+    trends: false,
+  };
+
+  function switchTab(tabName, updateHash = true) {
+    const validTabs = ['overview', 'prediction', 'trends'];
+    if (!validTabs.includes(tabName)) tabName = 'overview';
+
+    activeTabName = tabName;
+
+    // Update buttons
+    validTabs.forEach(t => {
+      const btn = document.getElementById(`tab-btn-${t}`);
+      const pane = document.getElementById(`pane-${t}`);
+      if (btn) {
+        btn.classList.toggle('active', t === tabName);
+        btn.setAttribute('aria-selected', t === tabName ? 'true' : 'false');
+      }
+      if (pane) {
+        pane.classList.toggle('active', t === tabName);
+      }
+    });
+
+    if (updateHash && window.location.hash !== `#${tabName}`) {
+      history.replaceState(null, '', `#${tabName}`);
+    }
+
+    // Lazy initialize charts on tab entry
+    if (tabName === 'overview' && !chartsInitialized.overview) {
+      initShortTermChart();
+      initLongTermChart();
+      initHourlyWidget();
+      initSunArc();
+      chartsInitialized.overview = true;
+    } else if (tabName === 'trends' && !chartsInitialized.trends) {
+      renderTrendsMetric('temperature');
+      chartsInitialized.trends = true;
+    }
+  }
+
+  function initTabs() {
+    // Read hash on load
+    const hash = window.location.hash.replace('#', '').toLowerCase();
+    if (['overview', 'prediction', 'trends'].includes(hash)) {
+      switchTab(hash, false);
+    } else {
+      switchTab('overview', false);
+    }
+
+    window.addEventListener('hashchange', () => {
+      const currentHash = window.location.hash.replace('#', '').toLowerCase();
+      if (['overview', 'prediction', 'trends'].includes(currentHash)) {
+        switchTab(currentHash, false);
+      }
+    });
+  }
+
+  // ── 2. VIEW MODE TOGGLE (Student / Farmer / Event) ─────────────────────────
+  function setViewMode(mode) {
+    const root = document.getElementById('intel-root');
+    if (root) root.setAttribute('data-mode', mode);
+
+    ['student', 'farmer', 'event'].forEach(m => {
+      const btn = document.getElementById(`btn-mode-${m}`);
+      const bullets = document.getElementById(`bullets-${m}`);
+      if (btn) btn.classList.toggle('active', m === mode);
+      if (bullets) bullets.style.display = (m === mode) ? 'flex' : 'none';
+    });
+  }
+
+  // ── 3. OVERVIEW CHARTS: SHORT-TERM & 24-48H TRAJECTORY ────────────────────
+  let shortChart = null, longChart = null;
+
+  function initShortTermChart() {
+    const ctx = document.getElementById('shortTermChart');
+    if (!ctx || !SHORT_SLOTS.length || shortChart) return;
+
+    const labels = SHORT_SLOTS.map(s => s.time);
+    const popData = SHORT_SLOTS.map(s => s.pop);
+
+    let maxVal = -1, maxIdx = 0;
+    popData.forEach((v, i) => { if (v > maxVal) { maxVal = v; maxIdx = i; } });
+
+    const bgColors = popData.map((v, i) =>
+      i === maxIdx && v > 0 ? 'rgba(56, 189, 248, 0.95)' : 'rgba(56, 189, 248, 0.45)'
+    );
+    const borderColors = popData.map((v, i) =>
+      i === maxIdx && v > 0 ? '#38bdf8' : 'rgba(56, 189, 248, 0.65)'
+    );
+
+    shortChart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [{
+          label: 'Precipitation Probability (%)',
+          data: popData,
+          backgroundColor: bgColors,
+          borderColor: borderColors,
+          borderWidth: 1.5,
+          borderRadius: 6,
+          barPercentage: 0.6,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: 'rgba(11, 19, 41, 0.95)',
+            titleColor: '#fff',
+            bodyColor: '#38bdf8',
+            borderColor: 'rgba(56, 189, 248, 0.4)',
+            borderWidth: 1,
+            padding: 8,
+            callbacks: {
+              title: items => SHORT_SLOTS[items[0].dataIndex].fullTime + ' · ' + SHORT_SLOTS[items[0].dataIndex].desc,
+              label: item => `Rain Chance: ${item.raw}% (${SHORT_SLOTS[item.dataIndex].temp}°C)`
+            }
+          }
+        },
+        scales: {
+          x: { grid: { display: false }, ticks: { font: { size: 11, weight: '600' } } },
+          y: { min: 0, max: 100, ticks: { stepSize: 25, callback: v => v + '%' }, grid: { color: 'rgba(255, 255, 255, 0.06)' } }
+        }
+      }
+    });
+  }
+
+  function initLongTermChart() {
+    const ctx = document.getElementById('longTermChart');
+    if (!ctx || !HOURLY_48H.length || longChart) return;
+
+    const labels = HOURLY_48H.map(h => h.time);
+    const tempData = HOURLY_48H.map(h => h.temp);
+    const popData = HOURLY_48H.map(h => h.pop);
+
+    const chartCtx = ctx.getContext('2d');
+    const tempGrad = chartCtx.createLinearGradient(0, 0, 0, 260);
+    tempGrad.addColorStop(0, 'rgba(245, 158, 11, 0.38)');
+    tempGrad.addColorStop(1, 'rgba(245, 158, 11, 0.01)');
+
+    const popGrad = chartCtx.createLinearGradient(0, 0, 0, 260);
+    popGrad.addColorStop(0, 'rgba(56, 189, 248, 0.32)');
+    popGrad.addColorStop(1, 'rgba(56, 189, 248, 0.01)');
+
+    longChart = new Chart(ctx, {
+      data: {
+        labels: labels,
+        datasets: [
+          {
+            type: 'line',
+            label: 'Temperature (°C)',
+            data: tempData,
+            borderColor: '#f59e0b',
+            backgroundColor: tempGrad,
+            borderWidth: 2.5,
+            tension: 0.35,
+            fill: true,
+            pointBackgroundColor: '#f59e0b',
+            pointRadius: 3,
+            pointHoverRadius: 6,
+            yAxisID: 'yTemp'
+          },
+          {
+            type: 'line',
+            label: 'Rain Probability (%)',
+            data: popData,
+            borderColor: '#38bdf8',
+            backgroundColor: popGrad,
+            borderWidth: 2,
+            tension: 0.3,
+            fill: true,
+            pointBackgroundColor: '#38bdf8',
+            pointRadius: 2.5,
+            pointHoverRadius: 5,
+            yAxisID: 'yPop'
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { display: true, position: 'top', labels: { boxWidth: 12, padding: 12, font: { size: 11, weight: '600' } } },
+          tooltip: {
+            backgroundColor: 'rgba(11, 19, 41, 0.95)',
+            titleColor: '#fff',
+            borderColor: 'rgba(255, 255, 255, 0.18)',
+            borderWidth: 1,
+            padding: 10,
+            callbacks: {
+              title: items => HOURLY_48H[items[0].dataIndex].time + ' · ' + HOURLY_48H[items[0].dataIndex].desc,
+              label: item => item.datasetIndex === 0
+                ? ` Temp: ${item.raw}°C (Feels ${HOURLY_48H[item.dataIndex].feels}°C)`
+                : ` Rain Chance: ${item.raw}%`
+            }
+          }
+        },
+        scales: {
+          x: { grid: { display: false }, ticks: { maxTicksLimit: 8, font: { size: 10 } } },
+          yTemp: { type: 'linear', position: 'left', grid: { color: 'rgba(255, 255, 255, 0.06)' }, ticks: { callback: v => v + '°' } },
+          yPop: { type: 'linear', position: 'right', min: 0, max: 100, grid: { display: false }, ticks: { stepSize: 25, callback: v => v + '%' } }
+        }
+      }
+    });
+  }
+
+  // ── 4. REUSED MSN HOURLY WIDGET (Tabs & Chart/List toggle) ─────────────────
+  let hwChart = null;
+  let hwCurrentTab = 'overview';
+
+  const HW_CONFIG = {
+    overview:  { label: 'Temp',     unit: '°',    color: '#fbbf24', bg: 'rgba(251,191,36,0.12)', fill: true,  type: 'line', key: 'temp' },
+    precip:    { label: 'Precip',   unit: '%',    color: '#60a5fa', bg: 'rgba(96,165,250,0.4)',  fill: true,  type: 'bar',  key: 'precip' },
+    wind:      { label: 'Wind',     unit: ' km/h',color: '#34d399', bg: 'rgba(52,211,153,0.12)', fill: true,  type: 'line', key: 'wind' },
+    aqi:       { label: 'AQI',      unit: '',     color: '#a78bfa', bg: 'rgba(167,139,250,0.12)',fill: false, type: 'line', key: null },
+    humidity:  { label: 'Humidity', unit: '%',    color: '#38bdf8', bg: 'rgba(56,189,248,0.12)', fill: true,  type: 'line', key: 'humidity' },
+    clouds:    { label: 'Clouds',   unit: '%',    color: '#94a3b8', bg: 'rgba(148,163,184,0.15)',fill: true,  type: 'line', key: 'clouds' },
+  };
+
+  function initHourlyWidget() {
+    const canvas = document.getElementById('hw-chart');
+    if (!canvas || !HOURLY_MSN.length || hwChart) return;
+
+    hwRenderChart('overview');
+
+    document.querySelectorAll('.hw-tab').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.hw-tab').forEach(b => b.classList.remove('hw-tab-active'));
+        btn.classList.add('hw-tab-active');
+        const tab = btn.getAttribute('data-tab');
+        hwCurrentTab = tab;
+        hwRenderChart(tab);
+        hwUpdateSlotValues(tab);
+        hwUpdateListValues(tab);
+      });
+    });
+  }
+
+  function hwRenderChart(tabKey) {
+    const cfg = HW_CONFIG[tabKey];
+    const canvas = document.getElementById('hw-chart');
+    if (!canvas) return;
+
+    let dataVals = [];
+    if (tabKey === 'aqi') {
+      const baseAqi = {{ aqi_index | default(1) }};
+      dataVals = HOURLY_MSN.map(() => baseAqi);
+    } else {
+      dataVals = HOURLY_MSN.map(h => h[cfg.key]);
+    }
+
+    if (hwChart) { hwChart.destroy(); hwChart = null; }
+
+    hwChart = new Chart(canvas.getContext('2d'), {
+      type: cfg.type,
+      data: {
+        labels: HOURLY_MSN.map(h => h.time),
+        datasets: [{
+          label: cfg.label,
+          data: dataVals,
+          borderColor: cfg.color,
+          backgroundColor: cfg.bg,
+          borderWidth: 2,
+          tension: 0.35,
+          fill: cfg.fill,
+          pointRadius: 2,
+          pointHoverRadius: 5,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { display: false }, ticks: { font: { size: 10 } } },
+          y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { font: { size: 10 }, callback: v => v + cfg.unit } }
+        }
+      }
+    });
+
+    const precipStrip = document.getElementById('hw-precip-strip');
+    if (precipStrip) {
+      precipStrip.style.display = (tabKey === 'overview') ? 'flex' : 'none';
+    }
+  }
+
+  function hwUpdateSlotValues(tabKey) {
+    const cfg = HW_CONFIG[tabKey];
+    HOURLY_MSN.forEach((h, i) => {
+      const el = document.getElementById(`hw-sv-${i}`);
+      if (!el) return;
+      if (tabKey === 'aqi') el.textContent = 'AQI {{ aqi_index }}';
+      else el.textContent = h[cfg.key] + cfg.unit;
+    });
+  }
+
+  function hwUpdateListValues(tabKey) {
+    const cfg = HW_CONFIG[tabKey];
+    const colLbl = document.getElementById('hw-list-col-label');
+    if (colLbl) colLbl.textContent = cfg.label;
+    document.querySelectorAll('.hw-list-val').forEach(el => {
+      const val = el.getAttribute(`data-${cfg.key || 'temp'}`);
+      el.textContent = val + cfg.unit;
+    });
+  }
+
+  function hwSetView(view) {
+    const isChart = view === 'chart';
+    document.getElementById('hw-chart-view').style.display = isChart ? 'block' : 'none';
+    document.getElementById('hw-list-view').style.display = isChart ? 'none' : 'block';
+    document.getElementById('hw-btn-chart').classList.toggle('hw-toggle-active', isChart);
+    document.getElementById('hw-btn-list').classList.toggle('hw-toggle-active', !isChart);
+  }
+
+  // ── 5. REUSED SUN ARC ANIMATION ───────────────────────────────────────────
+  function initSunArc() {
+    if (!SUN_TIMES.sunrise || !SUN_TIMES.sunset) return;
+
+    const sr = new Date(SUN_TIMES.sunrise * 1000);
+    const ss = new Date(SUN_TIMES.sunset * 1000);
+
+    const srEl = document.getElementById('sunrise-time');
+    const ssEl = document.getElementById('sunset-time');
+    if (srEl) srEl.textContent = sr.toTimeString().slice(0, 5);
+    if (ssEl) ssEl.textContent = ss.toTimeString().slice(0, 5);
+
+    const totalMin = Math.round((ss - sr) / 60000);
+    const h = Math.floor(totalMin / 60), m = totalMin % 60;
+    const dlEl = document.getElementById('day-length');
+    if (dlEl) dlEl.textContent = `${h}h ${m}m`;
+
+    const now = new Date();
+    let frac = (now - sr) / (ss - sr);
+    frac = Math.max(0, Math.min(1, frac));
+
+    const totalLen = Math.PI * 90;
+    const activeLen = frac * totalLen;
+    const arcActive = document.getElementById('sun-arc-active');
+    if (arcActive) arcActive.setAttribute('stroke-dasharray', `${activeLen} 283`);
+
+    const angle = Math.PI * (1 - frac);
+    const cx = 100 + 90 * Math.cos(angle);
+    const cy = 100 - 90 * Math.sin(angle);
+    const sunBall = document.getElementById('sun-ball');
+    if (sunBall) {
+      sunBall.setAttribute('cx', cx.toFixed(1));
+      sunBall.setAttribute('cy', cy.toFixed(1));
+    }
+  }
+
+  // ── 6. TRENDS TAB (4-TAB SYSTEM + RADIAL DONUT + ANNUAL STATS) ────────────
+  const TABS = {
+    temperature: {
+      label:'Temperature', subtitle:'Daily max & min temperature (°C)', unit:'°C',
+      actualColor:'#fbbf24', histColor:'rgba(96,165,250,0.85)',
+      histMetric:'tmax',
+      omeoKeys:['temperature_2m_max','temperature_2m_min'],
+      hasHist:true, cardColor:'#fbbf24',
+    },
+    precipitation: {
+      label:'Precipitation', subtitle:'Daily precipitation sum (mm)', unit:'mm',
+      actualColor:'rgba(96,165,250,1)', histColor:'rgba(167,139,250,0.85)',
+      histMetric:'precip',
+      omeoKeys:['precipitation_sum'],
+      hasHist:true, cardColor:'rgba(96,165,250,1)',
+    },
+    humidity: {
+      label:'Humidity', subtitle:'Mean relative humidity (%)', unit:'%',
+      actualColor:'rgba(56,189,248,1)', histColor:null,
+      histMetric:null,
+      omeoKeys:['relative_humidity_2m_mean'],
+      hasHist:false, cardColor:'rgba(56,189,248,1)',
+    },
+    wind: {
+      label:'Wind Speed', subtitle:'Daily max wind speed (km/h)', unit:'km/h',
+      actualColor:'rgba(52,211,153,1)', histColor:'rgba(248,113,113,0.85)',
+      histMetric:'wind',
+      omeoKeys:['wind_speed_10m_max'],
+      hasHist:true, cardColor:'rgba(52,211,153,1)',
+    },
+  };
+
+  let trendsMainChart = null, trendsDonutChart = null;
+  const trendsCache = { actual: null, hist: {} };
+
+  function doyFromDate(d) {
+    const start = new Date(d.getFullYear(), 0, 0);
+    const diff = d - start + (start.getTimezoneOffset() - d.getTimezoneOffset()) * 60000;
+    return Math.floor(diff / 86400000);
+  }
+
+  function dateRange12Months() {
+    const end = new Date();
+    end.setDate(end.getDate() - 1);
+    const start = new Date(end);
+    start.setFullYear(start.getFullYear() - 1);
+    start.setDate(start.getDate() + 1);
+    return { start: start.toISOString().slice(0, 10), end: end.toISOString().slice(0, 10) };
+  }
+
+  function fmtDate(ds) {
+    const d = new Date(ds + 'T00:00:00');
+    return d.toLocaleDateString('en-IN', { month: 'short', day: 'numeric' });
+  }
+
+  function round1(v) { return Math.round(v * 10) / 10; }
+
+  async function fetchTrendsActual() {
+    if (trendsCache.actual) return trendsCache.actual;
+    const { start, end } = dateRange12Months();
+    const vars = 'temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,relative_humidity_2m_mean';
+    const url = `https://archive-api.open-meteo.com/v1/archive?latitude=${TR.lat}&longitude=${TR.lon}&start_date=${start}&end_date=${end}&daily=${vars}&timezone=auto`;
+    const r = await fetch(url);
+    if (!r.ok) throw new Error('Open-Meteo API error: ' + r.status);
+    trendsCache.actual = await r.json();
+    return trendsCache.actual;
+  }
+
+  async function fetchTrendsHist(metric) {
+    if (trendsCache.hist[metric]) return trendsCache.hist[metric];
+    if (!TR.histCity) return [];
+    const url = `/api/trends?city=${encodeURIComponent(TR.histCity)}&metric=${metric}&doy_start=1&doy_end=365`;
+    const r = await fetch(url);
+    if (!r.ok) return [];
+    const j = await r.json();
+    trendsCache.hist[metric] = j.data || [];
+    return trendsCache.hist[metric];
+  }
+
+  function buildLut(data) {
+    const lut = {};
+    if (data) data.forEach(d => { lut[d.doy] = d.value; });
+    return lut;
+  }
+
+  async function renderTrendsMetric(tabKey) {
+    document.querySelectorAll('.trends-tab').forEach(b => {
+      const isAct = b.getAttribute('data-tab') === tabKey;
+      b.classList.toggle('trends-tab-active', isAct);
+      b.setAttribute('aria-selected', isAct ? 'true' : 'false');
+    });
+
+    const tab = TABS[tabKey];
+    document.getElementById('trends-chart-card').style.setProperty('--tab-color', tab.cardColor);
+    document.getElementById('trends-chart-title').textContent = tab.label + ' — Last 12 months';
+    document.getElementById('trends-chart-subtitle').textContent = tab.subtitle;
+    document.getElementById('trends-humid-note').style.display = (tabKey === 'humidity') ? 'flex' : 'none';
+
+    document.getElementById('trends-loading').style.display = 'flex';
+    document.getElementById('trends-chart-wrap').style.display = 'none';
+    document.getElementById('trends-legend').style.display = 'none';
+
+    try {
+      const actual = await fetchTrendsActual();
+      const dates = actual.daily.time;
+      const labels = dates.map(fmtDate);
+
+      const datasets = [];
+
+      if (tabKey === 'temperature') {
+        const tmaxV = actual.daily['temperature_2m_max'];
+        const tminV = actual.daily['temperature_2m_min'];
+        datasets.push({ label: 'Max Temp (actual)', data: tmaxV, borderColor: '#fbbf24', backgroundColor: 'rgba(251,191,36,0.07)', borderWidth: 2, pointRadius: 0, pointHoverRadius: 5, fill: false, tension: 0.35 });
+        datasets.push({ label: 'Min Temp (actual)', data: tminV, borderColor: 'rgba(251,191,36,0.42)', backgroundColor: 'transparent', borderWidth: 1.5, pointRadius: 0, pointHoverRadius: 4, fill: false, tension: 0.35 });
+        if (TR.hasHist && TR.histCity) {
+          const [htD, htnD] = await Promise.all([fetchTrendsHist('tmax'), fetchTrendsHist('tmin')]);
+          const lut1 = buildLut(htD), lut2 = buildLut(htnD);
+          datasets.push({ label: 'Max Temp (hist avg)', data: dates.map(d => { const doy = doyFromDate(new Date(d + 'T00:00:00')); return lut1[doy] != null ? lut1[doy] : null; }), borderColor: 'rgba(96,165,250,0.85)', backgroundColor: 'transparent', borderWidth: 1.8, borderDash: [6,4], pointRadius: 0, pointHoverRadius: 4, fill: false, tension: 0.35 });
+          datasets.push({ label: 'Min Temp (hist avg)', data: dates.map(d => { const doy = doyFromDate(new Date(d + 'T00:00:00')); return lut2[doy] != null ? lut2[doy] : null; }), borderColor: 'rgba(96,165,250,0.42)', backgroundColor: 'transparent', borderWidth: 1.4, borderDash: [4,4], pointRadius: 0, pointHoverRadius: 3, fill: false, tension: 0.35 });
+        }
+      } else {
+        const key = tab.omeoKeys[0];
+        const vals = actual.daily[key];
+        const bg = tabKey === 'precipitation' ? 'rgba(96,165,250,0.30)' : 'rgba(56,189,248,0.08)';
+        datasets.push({ label: tab.label + ' (actual)', data: vals, borderColor: tab.actualColor, backgroundColor: bg, borderWidth: 2, pointRadius: 0, pointHoverRadius: 5, fill: tabKey === 'precipitation', tension: tabKey === 'precipitation' ? 0 : 0.35 });
+        if (TR.hasHist && TR.histCity && tab.hasHist && tab.histMetric) {
+          const histD = await fetchTrendsHist(tab.histMetric);
+          const lut = buildLut(histD);
+          datasets.push({ label: tab.label + ' (hist avg)', data: dates.map(d => { const doy = doyFromDate(new Date(d + 'T00:00:00')); return lut[doy] != null ? lut[doy] : null; }), borderColor: tab.histColor, backgroundColor: 'transparent', borderWidth: 1.8, borderDash: [6,4], pointRadius: 0, pointHoverRadius: 4, fill: false, tension: 0.35 });
+        }
+      }
+
+      const canvas = document.getElementById('trends-main-chart');
+      if (trendsMainChart) { trendsMainChart.destroy(); trendsMainChart = null; }
+
+      trendsMainChart = new Chart(canvas.getContext('2d'), {
+        type: tabKey === 'precipitation' ? 'bar' : 'line',
+        data: { labels, datasets },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: 'rgba(11,26,46,0.96)',
+              borderColor: tab.cardColor,
+              borderWidth: 1,
+              padding: 10,
+              callbacks: {
+                title: items => new Date(dates[items[0].dataIndex] + 'T00:00:00').toLocaleDateString('en-IN', { weekday:'short', month:'long', day:'numeric' }),
+                label: item => item.raw != null ? `  ${item.dataset.label}: ${round1(item.raw)} ${tab.unit}` : null
+              }
+            }
+          },
+          scales: {
+            x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { font: { size: 10 }, maxTicksLimit: 12 } },
+            y: { position: 'right', grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { font: { size: 10 }, callback: v => v + ' ' + tab.unit } }
+          }
+        }
+      });
+
+      document.getElementById('trends-loading').style.display = 'none';
+      document.getElementById('trends-chart-wrap').style.display = 'block';
+      document.getElementById('trends-legend').style.display = 'flex';
+      document.getElementById('leg-actual-line').style.background = tab.actualColor;
+      document.getElementById('leg-actual-label').textContent = `${tab.label} — last 12 months (actual)`;
+
+      await renderDonutAndStats(actual);
+
+    } catch (err) {
+      console.warn('Trends error:', err);
+      document.getElementById('trends-loading').innerHTML = `<div style="color:var(--text-muted);">Could not fetch climate records: ${err.message}</div>`;
+    }
+  }
+
+  async function renderDonutAndStats(actual) {
+    function avg(arr) { const v = arr.filter(x => x !== null && x !== undefined); return v.length ? round1(v.reduce((a,b)=>a+b,0)/v.length) : null; }
+    function sum(arr) { const v = arr.filter(x => x !== null && x !== undefined); return v.length ? round1(v.reduce((a,b)=>a+b,0)) : null; }
+
+    const tmaxA = avg(actual.daily['temperature_2m_max']);
+    const tminA = avg(actual.daily['temperature_2m_min']);
+    const meanTemp = (tmaxA != null && tminA != null) ? round1((tmaxA + tminA) / 2) : tmaxA;
+    const precipSum = sum(actual.daily['precipitation_sum']);
+    const windAvg   = avg(actual.daily['wind_speed_10m_max']);
+    const humidAvg  = avg(actual.daily['relative_humidity_2m_mean']);
+
+    let histMeanTemp = null, histPrecipSum = null, histWindAvg = null;
+    if (TR.hasHist && TR.histCity) {
+      const [hT, hP, hW] = await Promise.all([fetchTrendsHist('tmax'), fetchTrendsHist('precip'), fetchTrendsHist('wind')]);
+      if (hT.length) histMeanTemp = avg(hT.map(x => x.value));
+      if (hP.length) histPrecipSum = sum(hP.map(x => x.value));
+      if (hW.length) histWindAvg   = avg(hW.map(x => x.value));
+    }
+
+    const donutEl = document.getElementById('donut-center-val');
+    if (donutEl) donutEl.textContent = (meanTemp != null ? meanTemp + '°C' : '—');
+
+    const donutCanvas = document.getElementById('trends-donut-chart');
+    if (donutCanvas && !trendsDonutChart) {
+      const donutData = TR.hasHist && histMeanTemp ? [meanTemp, histMeanTemp] : [meanTemp, 0];
+      const donutColors = ['#fbbf24', 'rgba(96,165,250,0.7)'];
+      trendsDonutChart = new Chart(donutCanvas.getContext('2d'), {
+        type: 'doughnut',
+        data: {
+          labels: ['Actual (12 mo)', 'Historical (24 yr)'],
+          datasets: [{ data: donutData, backgroundColor: donutColors, borderWidth: 0, hoverOffset: 4 }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          cutout: '72%',
+          plugins: { legend: { display: false }, tooltip: { callbacks: { label: item => ` ${item.label}: ${item.raw}°C` } } }
+        }
+      });
+    }
+
+    const statsTable = document.getElementById('trends-stats-table');
+    if (statsTable) {
+      statsTable.innerHTML = `
+        <div class="trends-stat-row">
+          <span class="trends-stat-label">🌡️ Avg Max Temp</span>
+          <div class="trends-stat-vals">
+            <span class="trends-stat-val actual">${tmaxA ?? '—'}°C <small style="font-weight:400;color:var(--text-muted);">act</small></span>
+            <span class="trends-stat-val hist">${histMeanTemp != null ? histMeanTemp + '°C hist' : '—'}</span>
+          </div>
+        </div>
+        <div class="trends-stat-row">
+          <span class="trends-stat-label">🌧️ Total Precipitation</span>
+          <div class="trends-stat-vals">
+            <span class="trends-stat-val actual">${precipSum ?? '—'} mm <small style="font-weight:400;color:var(--text-muted);">act</small></span>
+            <span class="trends-stat-val hist">${histPrecipSum != null ? histPrecipSum + ' mm hist' : '—'}</span>
+          </div>
+        </div>
+        <div class="trends-stat-row">
+          <span class="trends-stat-label">💨 Avg Max Wind</span>
+          <div class="trends-stat-vals">
+            <span class="trends-stat-val actual">${windAvg ?? '—'} km/h <small style="font-weight:400;color:var(--text-muted);">act</small></span>
+            <span class="trends-stat-val hist">${histWindAvg != null ? histWindAvg + ' km/h hist' : '—'}</span>
+          </div>
+        </div>
+        <div class="trends-stat-row">
+          <span class="trends-stat-label">💧 Mean Humidity</span>
+          <div class="trends-stat-vals">
+            <span class="trends-stat-val actual">${humidAvg ?? '—'}% <small style="font-weight:400;color:var(--text-muted);">act</small></span>
+            <span class="trends-stat-val hist">—</span>
+          </div>
+        </div>
+      `;
+    }
+  }
+
+  // ── 7. CITY SEARCH AUTOCOMPLETE ───────────────────────────────────────────
+  function toggleCityDropdown() {
+    const dropdown = document.getElementById('city-nav-dropdown');
+    if (!dropdown) return;
+    const isOpen = dropdown.classList.contains('open');
+    if (isOpen) {
+      dropdown.classList.remove('open');
+    } else {
+      dropdown.classList.add('open');
+      const input = document.getElementById('intel-search-box-input');
+      if (input) input.focus();
+    }
+  }
+
+  function setupCitySearch() {
+    const input = document.getElementById('intel-search-box-input');
+    const resultsContainer = document.getElementById('intel-search-results');
+    if (!input || !resultsContainer) return;
+
+    let debounceTimer = null;
+    input.addEventListener('input', () => {
+      const q = input.value.trim();
+      clearTimeout(debounceTimer);
+      if (q.length < 2) {
+        resultsContainer.innerHTML = '';
+        return;
+      }
+      debounceTimer = setTimeout(async () => {
+        try {
+          const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+          const results = await res.json();
+          if (!results || !results.length) {
+            resultsContainer.innerHTML = '<div style="padding:0.75rem; color:var(--text-muted); font-size:0.8rem; text-align:center;">No locations found</div>';
+            return;
+          }
+          resultsContainer.innerHTML = results.map(item => `
+            <div class="intel-nav-dropdown-item" onclick="navigateToIntel(${item.lat}, ${item.lon}, '${encodeURIComponent(item.name)}')">
+              <span>📍</span>
+              <strong style="color:#fff;">${item.name}</strong>
+              <span style="color:var(--text-muted); font-size:0.75rem;">${item.state ? item.state + ', ' : ''}${item.country}</span>
+            </div>
+          `).join('');
+        } catch (e) {
+          console.warn('Search query error', e);
+        }
+      }, 250);
+    });
+
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        const q = input.value.trim();
+        if (q) window.location.href = `/intelligence?city=${encodeURIComponent(q)}#${activeTabName}`;
+      }
+    });
+
+    document.addEventListener('click', (e) => {
+      const selectorWrap = document.querySelector('.intel-city-selector-wrap');
+      const dropdown = document.getElementById('city-nav-dropdown');
+      if (selectorWrap && dropdown && !selectorWrap.contains(e.target)) {
+        dropdown.classList.remove('open');
+      }
+    });
+  }
+
+  function navigateToIntel(lat, lon, name) {
+    window.location.href = `/intelligence?city=${name}&lat=${lat}&lon=${lon}#${activeTabName}`;
+  }
+
+  // ── INITIALIZATION ────────────────────────────────────────────────────────
+  document.addEventListener('DOMContentLoaded', () => {
+    initTabs();
+    setupCitySearch();
+  });
+  </script>
+</body>
+</html>

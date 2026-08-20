@@ -22,6 +22,7 @@
       </div>
       <div class="search-dropdown" id="nav-search-dropdown"></div>
     </div>
+    <a href="/intelligence?city={{ city }}&amp;lat={{ lat }}&amp;lon={{ lon }}" class="btn-ml" style="white-space:nowrap; background:linear-gradient(135deg, rgba(168,85,247,0.22), rgba(6,182,212,0.22)); border:1px solid rgba(168,85,247,0.45); color:#c084fc;">⚡ AI Intelligence</a>
     <a href="/predict-form" class="btn-ml" style="white-space:nowrap;">🤖 Predict Rain</a>
     <a href="/trends?city={{ city }}&amp;lat={{ lat }}&amp;lon={{ lon }}" class="btn-ml" style="white-space:nowrap; background:rgba(96,165,250,0.18); border:1px solid rgba(96,165,250,0.3); color:rgba(96,165,250,1);">📈 Trends</a>
   </nav>
@@ -463,7 +464,7 @@
     <div class="ml-banner fade-in-up delay-4" style="margin-bottom:2rem;">
       <div class="ml-banner-text">
         <h3>🤖 AI Rain Predictor</h3>
-        <p>CatBoost ML model — 85%+ accuracy predicting if it will rain tomorrow.</p>
+        <p>CatBoost ML model — 85%+ accuracy predicting rain probability.</p>
       </div>
       <a href="/predict-form" class="btn-ml">Try It →</a>
     </div>
@@ -472,7 +473,7 @@
   {% endif %}
 
   <footer class="footer">
-    <p>© 2026 GOOD WEATHER &nbsp;·&nbsp; Data by <a href="https://openweathermap.org" target="_blank">OpenWeatherMap</a> &nbsp;·&nbsp; <a href="/">Home</a></p>
+    <p>© 2026 GOOD WEATHER &nbsp;·&nbsp; Data by <a href="https://openweathermap.org" target="_blank">OpenWeatherMap</a> &nbsp;·&nbsp; <a href="/intelligence?city={{ city }}">⚡ AI Intelligence</a> &nbsp;·&nbsp; <a href="/">Home</a></p>
   </footer>
 
   <!-- ── Scripts ─────────────────────────────────────────────────────── -->

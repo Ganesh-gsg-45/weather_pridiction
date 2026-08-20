@@ -1,16 +1,22 @@
 import sys
 import os
 import math
+from math import radians, sin, cos, sqrt, atan2
 from datetime import datetime, UTC, date, timedelta
 import requests
-from flask import Flask, request, render_template, jsonify, Response
+from flask import Flask, request, render_template, jsonify, Response, redirect
 from dotenv import load_dotenv
 
 from weatherprediction.exception import WeatherException
 from weatherprediction.logger import logger
-from weatherprediction.pipeline.predict_pipeline import CustomData, PredictPipeline
+from weatherprediction.pipeline.predict_pipeline import CustomData, PredictPipeline, DECISION_THRESHOLD
 
 import json
+
+# ── Config imports — single source of truth for city coordinates ───────────────
+import sys as _sys
+_sys.path.insert(0, os.path.dirname(__file__))
+from config.constants import CITY_COORDS as TRAINED_CITY_COORDS
 
 load_dotenv()
 app = Flask(__name__)
@@ -26,36 +32,205 @@ _HIST_AVG_PATH = os.path.join(os.path.dirname(__file__), "artifacts", "historica
 try:
     with open(_HIST_AVG_PATH, "r", encoding="utf-8") as _f:
         HIST_AVG: dict = json.load(_f)
-    logger.info(f"Loaded historical averages: {len(HIST_AVG)} cities, "
-                f"{sum(len(v) for v in HIST_AVG.values())} city-doy entries")
+    logger.info(f"Loaded historical averages: {len(HIST_AVG)} cities")
 except FileNotFoundError:
     HIST_AVG = {}
     logger.warning(f"Historical averages file not found at {_HIST_AVG_PATH}. "
                    "Run scripts/generate_historical_averages.py to generate it.")
 
+HIST_CITY_ALIASES = {
+    "bengaluru": "Bangalore",
+    "bangalore": "Bangalore",
+    "bombay": "Mumbai",
+    "mumbai": "Mumbai",
+    "calcutta": "Kolkata",
+    "kolkata": "Kolkata",
+    "madras": "Chennai",
+    "chennai": "Chennai",
+    "prayagraj": "Allahabad",
+    "allahabad": "Allahabad",
+    "gurugram": "Gurgaon",
+    "gurgaon": "Gurgaon",
+    "puducherry": "Pondicherry",
+    "pondicherry": "Pondicherry",
+    "cochin": "Kochi",
+    "kochi": "Kochi",
+    "trivandrum": "Thiruvananthapuram",
+    "thiruvananthapuram": "Thiruvananthapuram",
+    "mysuru": "Mysore",
+    "mysore": "Mysore",
+}
+
+def find_hist_city(name: str):
+    if not name:
+        return None
+    name_clean = name.strip()
+    name_lower = name_clean.lower()
+    if name_clean in HIST_AVG:
+        return name_clean
+    for k in HIST_AVG:
+        if k.lower() == name_lower:
+            return k
+    alias = HIST_CITY_ALIASES.get(name_lower)
+    if alias:
+        for k in HIST_AVG:
+            if k.lower() == alias.lower():
+                return k
+    return None
+
+
+# ── Coverage & Haversine ───────────────────────────────────────────────────────
+COVERAGE_RADIUS_KM = 75  # locations within this radius of a trained city use custom model
+
+def haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """
+    Compute great-circle distance between two points using the haversine formula.
+    Returns distance in kilometres. Uses proper radian conversion — not a flat
+    Euclidean approximation on lat/lon degrees.
+    """
+    R = 6371.0  # Earth radius in km (mean radius, WGS-84)
+    lat1, lon1, lat2, lon2 = map(radians, [lat1, lon1, lat2, lon2])
+    dlat = lat2 - lat1
+    dlon = lon2 - lon1
+    a = sin(dlat / 2) ** 2 + cos(lat1) * cos(lat2) * sin(dlon / 2) ** 2
+    c = 2 * atan2(sqrt(a), sqrt(1 - a))
+    return R * c
+
+
+def is_in_trained_coverage(
+    lat: float, lon: float
+) -> tuple[bool, str | None, float]:
+    """
+    Check whether (lat, lon) falls within COVERAGE_RADIUS_KM of any trained city.
+
+    Returns
+    -------
+    (in_coverage, nearest_city_name, nearest_distance_km)
+      in_coverage        : True if nearest city is within the radius
+      nearest_city_name  : name of the closest trained city (always present)
+      nearest_distance_km: haversine distance to that city in km (always present)
+    """
+    best_city = None
+    best_dist = float("inf")
+    for city_name, coords in TRAINED_CITY_COORDS.items():
+        dist = haversine_km(lat, lon, coords["lat"], coords["lon"])
+        if dist < best_dist:
+            best_dist = dist
+            best_city = city_name
+
+    in_coverage = best_dist <= COVERAGE_RADIUS_KM
+    logger.info(
+        f"Coverage check ({lat:.4f}, {lon:.4f}): nearest={best_city} "
+        f"dist={best_dist:.1f}km "
+        f"{'→ custom_model' if in_coverage else '→ owm_forecast (fallback)'}"
+    )
+    return in_coverage, best_city, round(best_dist, 1)
+
+
+def owm_pop_to_prediction(
+    pop: float,
+    nearest_city: str,
+    distance_km: float,
+) -> dict:
+    """
+    Convert OWM probability-of-precipitation (pop, 0.0–1.0) into the same
+    response dict shape as PredictPipeline.predict_advanced(), using the same
+    DECISION_THRESHOLD and risk bands for consistency between branches.
+
+    Parameters
+    ----------
+    pop          : OWM pop value in [0.0, 1.0]
+    nearest_city : name of the closest trained city
+    distance_km  : haversine distance to that city in km
+    """
+    prob_pct   = round(pop * 100, 1)
+    label      = "Yes" if pop >= DECISION_THRESHOLD else "No"
+    confidence = round(50.0 + abs(pop - 0.5) * 100.0, 1)
+
+    if prob_pct < 25.0:
+        risk_level  = "Low"
+        risk_color  = "#22c55e"
+        risk_bg     = "rgba(34,197,94,0.12)"
+        risk_border = "rgba(34,197,94,0.35)"
+    elif prob_pct < 37.5:
+        risk_level  = "Moderate"
+        risk_color  = "#f59e0b"
+        risk_bg     = "rgba(245,158,11,0.12)"
+        risk_border = "rgba(245,158,11,0.35)"
+    elif prob_pct < 70.0:
+        risk_level  = "High"
+        risk_color  = "#f97316"
+        risk_bg     = "rgba(249,115,22,0.12)"
+        risk_border = "rgba(249,115,22,0.35)"
+    else:
+        risk_level  = "Very High"
+        risk_color  = "#ef4444"
+        risk_bg     = "rgba(239,68,68,0.12)"
+        risk_border = "rgba(239,68,68,0.35)"
+
+    dist_str = f"{int(distance_km)}km"
+    return {
+        "prediction":        label,
+        "probability":       prob_pct,
+        "confidence":        confidence,
+        "risk_level":        risk_level,
+        "risk_color":        risk_color,
+        "risk_bg":           risk_bg,
+        "risk_border":       risk_border,
+        "prediction_source": "owm_forecast",
+        "source_label":      (
+            f"Powered by OpenWeatherMap forecast "
+            f"({dist_str} from nearest trained coverage: {nearest_city})"
+        ),
+        "nearest_city":      nearest_city,
+        "distance_km":       distance_km,
+    }
+
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 PREDICTION_FEEDBACK_LOG = os.path.join("logs", "prediction_feedback.csv")
 
-def log_prediction_feedback(city: str, lat: float, lon: float, date_str: str, prediction: str, probability: float, confidence: float, features: dict):
+def log_prediction_feedback(
+    city: str,
+    lat: float,
+    lon: float,
+    date_str: str,
+    prediction: str,
+    probability: float,
+    confidence: float,
+    features: dict,
+    prediction_source: str = "custom_model",
+):
     """
     Log live inference predictions to CSV feedback log with exact geographical
     coordinates for accurate historical outcome fetching.
+
+    prediction_source : 'custom_model' or 'owm_forecast' — enables per-source
+                        accuracy analysis in scripts/evaluate_feedback.py
     """
     try:
         os.makedirs(os.path.dirname(PREDICTION_FEEDBACK_LOG), exist_ok=True)
         with open(PREDICTION_FEEDBACK_LOG, mode="a", encoding="utf-8") as f:
             if f.tell() == 0:
-                f.write("timestamp,city,lat,lon,predict_date,prediction,probability,confidence,temp_max,temp_min,precip_sum,weather_code\n")
-            
-            ts = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
-            tmax = features.get("temperature_2m_max", "")
-            tmin = features.get("temperature_2m_min", "")
-            prec = features.get("precipitation_sum", "")
+                f.write(
+                    "timestamp,city,lat,lon,predict_date,prediction,probability,"
+                    "confidence,temp_max,temp_min,precip_sum,weather_code,prediction_source\n"
+                )
+
+            ts    = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+            tmax  = features.get("temperature_2m_max", "")
+            tmin  = features.get("temperature_2m_min", "")
+            prec  = features.get("precipitation_sum", "")
             wcode = features.get("weather_code", "")
-            
-            f.write(f"{ts},{city},{lat},{lon},{date_str},{prediction},{probability},{confidence},{tmax},{tmin},{prec},{wcode}\n")
-            logger.info(f"Logged prediction feedback -> {city} ({lat},{lon}) [{date_str}]: {prediction} ({probability}%)")
+
+            f.write(
+                f"{ts},{city},{lat},{lon},{date_str},{prediction},{probability},"
+                f"{confidence},{tmax},{tmin},{prec},{wcode},{prediction_source}\n"
+            )
+            logger.info(
+                f"Logged prediction feedback -> {city} ({lat},{lon}) "
+                f"[{date_str}]: {prediction} ({probability}%) [{prediction_source}]"
+            )
     except Exception as exc:
         logger.warning(f"Could not write prediction log: {exc}")
 
@@ -190,85 +365,493 @@ def compute_moon_phase(dt: datetime = None) -> dict:
     }
 
 
-# ── Pages ──────────────────────────────────────────────────────────────────────
-@app.route("/", methods=["GET"])
-def index():
-    """GOOD WEATHER landing page."""
-    return render_template("index.html")
+# ── AI Weather Intelligence Helper Functions ──────────────────────────────────
+def get_weather_condition_image(weather_id: int, icon_code: str = "01d") -> dict:
+    """
+    Returns curated Unsplash CDN background and thumbnail images mapped by OWM condition ID.
+    Free under the Unsplash License for web applications.
+    """
+    is_day = "d" in icon_code
+
+    if 200 <= weather_id <= 232:
+        # Thunderstorm / Lightning
+        hero = "https://images.unsplash.com/photo-1605727216801-e27ce1d0cc28?auto=format&fit=crop&w=1600&q=80"
+        thumb = "https://images.unsplash.com/photo-1605727216801-e27ce1d0cc28?auto=format&fit=crop&w=400&q=80"
+    elif 500 <= weather_id <= 531:
+        # Rain / Showers
+        hero = "https://images.unsplash.com/photo-1519692933481-e162a57d6721?auto=format&fit=crop&w=1600&q=80"
+        thumb = "https://images.unsplash.com/photo-1519692933481-e162a57d6721?auto=format&fit=crop&w=400&q=80"
+    elif 300 <= weather_id <= 321:
+        # Drizzle
+        hero = "https://images.unsplash.com/photo-1534274988757-a28bf1a57c17?auto=format&fit=crop&w=1600&q=80"
+        thumb = "https://images.unsplash.com/photo-1534274988757-a28bf1a57c17?auto=format&fit=crop&w=400&q=80"
+    elif 600 <= weather_id <= 622:
+        # Snow
+        hero = "https://images.unsplash.com/photo-1483921020237-2ff51e8e4b22?auto=format&fit=crop&w=1600&q=80"
+        thumb = "https://images.unsplash.com/photo-1483921020237-2ff51e8e4b22?auto=format&fit=crop&w=400&q=80"
+    elif 700 <= weather_id <= 781:
+        # Atmosphere: Fog / Mist / Haze / Smoke
+        hero = "https://images.unsplash.com/photo-1487621167305-5d248087c724?auto=format&fit=crop&w=1600&q=80"
+        thumb = "https://images.unsplash.com/photo-1487621167305-5d248087c724?auto=format&fit=crop&w=400&q=80"
+    elif weather_id == 800:
+        # Clear Sky
+        if is_day:
+            hero = "https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1600&q=80"
+            thumb = "https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=400&q=80"
+        else:
+            hero = "https://images.unsplash.com/photo-1506703719100-a0f3a48c0f86?auto=format&fit=crop&w=1600&q=80"
+            thumb = "https://images.unsplash.com/photo-1506703719100-a0f3a48c0f86?auto=format&fit=crop&w=400&q=80"
+    elif weather_id in (801, 802):
+        # Scattered / Partly Cloudy
+        if is_day:
+            hero = "https://images.unsplash.com/photo-1595865701170-df8516086f5c?auto=format&fit=crop&w=1600&q=80"
+            thumb = "https://images.unsplash.com/photo-1595865701170-df8516086f5c?auto=format&fit=crop&w=400&q=80"
+        else:
+            hero = "https://images.unsplash.com/photo-1509773896068-7fd415d91e2e?auto=format&fit=crop&w=1600&q=80"
+            thumb = "https://images.unsplash.com/photo-1509773896068-7fd415d91e2e?auto=format&fit=crop&w=400&q=80"
+    else:
+        # Overcast / Broken Clouds (803, 804)
+        hero = "https://images.unsplash.com/photo-1534088568595-a066f410bcda?auto=format&fit=crop&w=1600&q=80"
+        thumb = "https://images.unsplash.com/photo-1534088568595-a066f410bcda?auto=format&fit=crop&w=400&q=80"
+
+    return {"hero": hero, "thumb": thumb}
 
 
-@app.route("/weather", methods=["GET"])
-def weather_dashboard():
-    """Full weather dashboard for a given city."""
-    city = request.args.get("city", "London")
-    lat  = request.args.get("lat", None)
-    lon  = request.args.get("lon", None)
+def get_country_flag(country_code: str) -> str:
+    """Return unicode emoji flag from 2-letter ISO country code."""
+    if not country_code or len(country_code) != 2:
+        return "🌍"
+    try:
+        return "".join(chr(127397 + ord(c)) for c in country_code.upper())
+    except Exception:
+        return "🌍"
 
-    # If lat/lon provided (geolocation), use them directly
+
+def generate_ai_weather_intelligence_content(
+    city: str,
+    country: str,
+    temp: int,
+    feels_like: int,
+    description: str,
+    pop_pct: int,
+    peak_short_pop: int,
+    peak_short_time: str,
+    wind_speed: float,
+    heat_stress: dict,
+    outdoor_activity: dict,
+    thunderstorm_risk: dict,
+) -> dict:
+    """
+    Generate accurate AI summaries and persona-based advice (Student, Farmer, Event)
+    strictly grounded in actual real-time meteorological indicators.
+    """
+    hi_c = heat_stress["heat_index_c"]
+    hi_tier = heat_stress["tier"]
+    score = outdoor_activity["score"]
+    storm_tier = thunderstorm_risk["tier"]
+
+    # 1. Concise Hero AI Summary Line
+    if storm_tier in ("Medium", "High"):
+        summary_line = f"Active storm risk detected: Convective cells likely with wind gusts up to {wind_speed} km/h. Peak rain probability reaches {peak_short_pop}% around {peak_short_time}."
+    elif peak_short_pop >= 50:
+        summary_line = f"Rain likely in the upcoming hours with {peak_short_pop}% peak probability at {peak_short_time}. Current temperature is {temp}°C (feels like {feels_like}°C)."
+    elif hi_tier in ("High", "Extreme"):
+        summary_line = f"Elevated thermal stress: Current heat index is {hi_c}°C with low precipitation risk ({pop_pct}%). Stay hydrated and limit peak sun exposure."
+    else:
+        summary_line = f"Favorable conditions in {city}: Current {temp}°C with {description.lower()}, mild wind at {wind_speed} km/h, and outdoor index at {score}/100."
+
+    # 2. Assistant Body Paragraph
+    assistant_body = (
+        f"{city} is experiencing {description.lower()} with {temp}°C (feels like {feels_like}°C). "
+        f"Precipitation outlook stands at {pop_pct}% currently, with short-term peak reaching {peak_short_pop}% around {peak_short_time}. "
+        f"Overall outdoor feasibility index is {score}/100 ({outdoor_activity['rating'].lower()})."
+    )
+
+    # 3. Mode Bullets
+    # Student Mode
+    if storm_tier == "High" or peak_short_pop >= 60:
+        tips_student = [
+            f"🌧 Carry waterproof backpack & umbrella; peak rain ({peak_short_pop}%) expected around {peak_short_time}.",
+            f"🚍 Commute delays possible during convective activity; allow extra transit time.",
+            f"💻 Indoor study zones or campus libraries recommended over outdoor seating."
+        ]
+    elif hi_tier in ("High", "Extreme"):
+        tips_student = [
+            f"💧 High heat index ({hi_c}°C); carry a refillable water bottle across campus.",
+            f"🌳 Utilize shaded walking paths between lecture halls during afternoon hours.",
+            f"👟 Outdoor sports practice best scheduled after sunset or early morning."
+        ]
+    else:
+        tips_student = [
+            f"🌤 Pleasant outdoor conditions ({temp}°C); ideal for campus quad study or walking commute.",
+            f"🚴 Cycling and walking routes are fully clear with low wind ({wind_speed} km/h).",
+            f"📚 Minimal weather disruption expected over the next 12 hours."
+        ]
+
+    # Farmer Mode
+    if peak_short_pop >= 50:
+        tips_farmer = [
+            f"🌧 Hold off on scheduled field irrigation — {peak_short_pop}% rain probability expected around {peak_short_time}.",
+            f"🚫 Postpone foliar spraying and fertilizer broadcasting to avoid chemical runoff.",
+            f"🚜 Ensure field drainage channels are cleared to prevent waterlogging."
+        ]
+    elif wind_speed > 25:
+        tips_farmer = [
+            f"💨 High wind speeds ({wind_speed} km/h) — avoid pesticide spraying due to drift hazard.",
+            f"🌾 Secure polyhouse sheets, nursery netting, and temporary farm shelters.",
+            f"💧 Soil moisture loss elevated; monitor shallow-root crop hydration."
+        ]
+    elif hi_tier in ("High", "Extreme"):
+        tips_farmer = [
+            f"🔥 Extreme heat index ({hi_c}°C) — irrigate standing crops in early morning or late evening.",
+            f"🐄 Provide shaded ventilation and adequate hydration for farm livestock.",
+            f"⚠️ Schedule intense manual farm labour before 10:00 AM to avoid heat stress."
+        ]
+    else:
+        tips_farmer = [
+            f"🌾 Favorable window for weeding, tilling, and harvest handling under {temp}°C.",
+            f"💧 Normal soil transpiration rate; continue routine drip/sprinkler scheduling.",
+            f"🧪 Stable wind ({wind_speed} km/h) and dry conditions are optimal for crop spraying."
+        ]
+
+    # Event Mode
+    if storm_tier in ("Medium", "High") or peak_short_pop >= 60:
+        tips_event = [
+            f"⚡ Rain / storm contingency: Have waterproof canopies & drainage ready for {peak_short_time} peak ({peak_short_pop}%).",
+            f"🔌 Ensure electrical cables, stage equipment, and generators are elevated and weatherized.",
+            f"📢 Prepare attendee communication in case indoor relocation is required."
+        ]
+    elif hi_tier in ("High", "Extreme"):
+        tips_event = [
+            f"🌡 Heat management: Set up shaded rest tents and hydration stations (Heat index: {hi_c}°C).",
+            f"🧊 Stock adequate cold beverages, ice, and misting fans for outdoor crowds.",
+            f"⏱ Schedule high-energy outdoor activities during cooler evening hours."
+        ]
+    else:
+        tips_event = [
+            f"🎪 Optimal outdoor event weather with {score}/100 activity rating at {temp}°C.",
+            f"🎈 Gentle winds ({wind_speed} km/h) will not disrupt tents, banners, or lightweight decor.",
+            f"☀️ Minimal rain risk ({pop_pct}%) throughout the immediate schedule."
+        ]
+
+    return {
+        "summary_line": summary_line,
+        "assistant_body": assistant_body,
+        "tips_student": tips_student,
+        "tips_farmer": tips_farmer,
+        "tips_event": tips_event,
+    }
+
+
+def compute_heat_index(temp_c: float, humidity: float) -> dict:
+    """
+    Compute Heat Index using the National Weather Service (NWS) Rothfusz regression equation.
+    
+    Formula Reference (NWS / NOAA):
+    1. Convert temp to Fahrenheit: tf = temp_c * 9/5 + 32
+    2. Steadman's preliminary formula: HI_simple = 0.5 * (tf + 61.0 + ((tf - 68.0) * 1.2) + (rh * 0.094))
+    3. If HI_simple >= 80°F, apply full 9-parameter Rothfusz polynomial with low/high RH adjustments:
+       HI = -42.379 + 2.04901523*tf + 10.14333127*rh - 0.22475541*tf*rh
+            - 0.00683783*tf^2 - 0.05481717*rh^2 + 0.00122874*tf^2*rh
+            + 0.00085282*tf*rh^2 - 0.00000199*tf^2*rh^2
+    4. Convert back to Celsius: hi_c = (HI - 32) * 5/9
+    
+    Tiers (NWS standard):
+    - Low (< 27°C / 80°F): Safe / Minimal heat stress
+    - Moderate (27°C - 32.9°C / 80°F - 90°F): Caution (fatigue possible with prolonged exposure)
+    - High (33°C - 40.9°C / 90°F - 105°F): Extreme Caution (heat cramps and exhaustion possible)
+    - Extreme (>= 41°C / >= 105°F): Danger / Extreme Danger (heatstroke likely with activity)
+    """
+    tf = float(temp_c) * 9.0 / 5.0 + 32.0
+    rh = max(0.0, min(100.0, float(humidity)))
+
+    # Preliminary Steadman approximation
+    hi_simple = 0.5 * (tf + 61.0 + ((tf - 68.0) * 1.2) + (rh * 0.094))
+
+    if hi_simple >= 80.0:
+        # Full Rothfusz regression equation
+        hi = (
+            -42.379
+            + 2.04901523 * tf
+            + 10.14333127 * rh
+            - 0.22475541 * tf * rh
+            - 0.00683783 * (tf ** 2)
+            - 0.05481717 * (rh ** 2)
+            + 0.00122874 * (tf ** 2) * rh
+            + 0.00085282 * tf * (rh ** 2)
+            - 0.00000199 * (tf ** 2) * (rh ** 2)
+        )
+        # NWS adjustment for low relative humidity
+        if rh < 13.0 and 80.0 <= tf <= 112.0:
+            hi -= ((13.0 - rh) / 4.0) * math.sqrt(max(0.0, (17.0 - abs(tf - 95.0)) / 17.0))
+        # NWS adjustment for high relative humidity
+        elif rh > 85.0 and 80.0 <= tf <= 87.0:
+            hi += ((rh - 85.0) / 10.0) * ((87.0 - tf) / 5.0)
+    else:
+        hi = hi_simple
+
+    hi_c = round((hi - 32.0) * 5.0 / 9.0, 1)
+
+    if hi_c < 27.0:
+        tier = "Low"
+        badge_class = "risk-badge-low"
+        color = "#22c55e"
+        desc = "Normal / Safe biometeorological conditions"
+    elif hi_c < 33.0:
+        tier = "Moderate"
+        badge_class = "risk-badge-med"
+        color = "#f59e0b"
+        desc = "Caution: Fatigue possible with prolonged outdoor exertion"
+    elif hi_c < 41.0:
+        tier = "High"
+        badge_class = "risk-badge-high"
+        color = "#f97316"
+        desc = "Extreme Caution: Heat cramps and exhaustion possible"
+    else:
+        tier = "Extreme"
+        badge_class = "risk-badge-crit"
+        color = "#ef4444"
+        desc = "Danger: High risk of heat exhaustion or heatstroke"
+
+    return {
+        "heat_index_c": hi_c,
+        "heat_index_f": round(hi, 1),
+        "tier": tier,
+        "badge_class": badge_class,
+        "color": color,
+        "desc": desc,
+    }
+
+
+def compute_thunderstorm_risk(current_wcode: int, upcoming_slots: list) -> dict:
+    """
+    Map OpenWeatherMap condition IDs (200-232) to Thunderstorm Risk severity tiers.
+    
+    OWM Condition Code Mapping:
+    - 200-202: Thunderstorm with rain (200=light, 201=moderate, 202=heavy)
+    - 210-221: Pure thunderstorm (210=light, 211=moderate, 212=heavy, 221=ragged)
+    - 230-232: Thunderstorm with drizzle (230=light, 231=moderate, 232=heavy)
+    
+    Severity Tiers:
+    - High: Codes 202, 212, 230, 231, 232 (Severe/heavy storm with precip or drizzle)
+    - Medium: Codes 200, 201, 210, 211, 221 (Light or standard thunderstorm)
+    - Low: No thunderstorm code detected in current or short-term forecast
+    """
+    all_codes = [current_wcode]
+    for s in upcoming_slots:
+        w_list = s.get("weather", [])
+        if w_list:
+            all_codes.append(w_list[0].get("id", 800))
+
+    storm_codes = [c for c in all_codes if 200 <= c <= 232]
+
+    if not storm_codes:
+        return {
+            "tier": "Low",
+            "badge_class": "risk-badge-low",
+            "color": "#22c55e",
+            "text": "No storm activity detected",
+            "detail": "Radar & forecast indicate zero thunderstorm activity in short-term window."
+        }
+
+    # Severe thunderstorm codes
+    if any(c in (202, 212, 230, 231, 232) for c in storm_codes):
+        return {
+            "tier": "High",
+            "badge_class": "risk-badge-crit",
+            "color": "#ef4444",
+            "text": "Severe storm activity predicted",
+            "detail": "Heavy thunderstorms with intense convective precipitation or squalls detected."
+        }
+    else:
+        return {
+            "tier": "Medium",
+            "badge_class": "risk-badge-med",
+            "color": "#f59e0b",
+            "text": "Thunderstorm activity likely",
+            "detail": "Convective storm cells detected in current conditions or upcoming forecast."
+        }
+
+
+def compute_outdoor_activity_score(
+    temp_c: float,
+    wind_kmh: float,
+    rain_pop_pct: float,
+    heat_index_c: float,
+    weather_id: int,
+) -> dict:
+    """
+    Weighted Explainable Outdoor Activity Index (0 - 100).
+    
+    Formula Design & Rationale:
+    ---------------------------
+    Base Score = 100 points
+    
+    1. Rain Probability Deduction (0 to 45 pts):
+       - Formula: (rain_pop_pct / 100) * 45
+       - Rain is the single largest disrupter of outdoor events, sports, and commutes.
+         At 100% rain chance, up to 45 points are deducted.
+         
+    2. Thermal Comfort Deduction (0 to 25 pts):
+       - Ideal outdoor temperature comfort zone: 18°C to 26°C (0 pt penalty).
+       - Colder than 18°C: penalty = min(25, (18 - temp_c) * 1.8)
+       - Warmer than 26°C: penalty = min(25, (temp_c - 26) * 1.8)
+       
+    3. Wind Speed Deduction (0 to 15 pts):
+       - Gentle/moderate breeze (<= 15 km/h) = 0 pt penalty.
+       - High wind (> 15 km/h): penalty = min(15, ((wind_kmh - 15) / 30) * 15)
+       
+    4. Heat Stress Deduction (0 to 15 pts):
+       - Heat index <= 30°C = 0 pt penalty.
+       - Elevated heat index (> 30°C): penalty = min(15, ((heat_index_c - 30) / 15) * 15)
+       
+    5. Severe Thunderstorm Condition Surcharge (0 or 20 pts):
+       - Active thunderstorm (OWM 200-232) deducts an additional 20 pts for immediate safety.
+       
+    Final Score = max(0, min(100, round(Base - (Rain + Temp + Wind + Heat + Storm))))
+    
+    Ratings:
+    - 80-100: Excellent (Optimal for sports, walks, picnics, and outdoor dining)
+    - 60-79:  Good (Favorable with mild atmospheric factors)
+    - 40-59:  Fair (Moderate weather friction; rain gear or hydration recommended)
+    - 0-39:   Poor (Unfavorable/hazardous; indoor alternatives recommended)
+    """
+    base = 100.0
+
+    # 1. Rain deduction
+    rain_penalty = (float(rain_pop_pct) / 100.0) * 45.0
+
+    # 2. Temperature deviation
+    temp = float(temp_c)
+    if temp < 18.0:
+        temp_penalty = min(25.0, (18.0 - temp) * 1.8)
+    elif temp > 26.0:
+        temp_penalty = min(25.0, (temp - 26.0) * 1.8)
+    else:
+        temp_penalty = 0.0
+
+    # 3. Wind speed
+    wind = float(wind_kmh)
+    if wind > 15.0:
+        wind_penalty = min(15.0, ((wind - 15.0) / 30.0) * 15.0)
+    else:
+        wind_penalty = 0.0
+
+    # 4. Heat Index
+    hi = float(heat_index_c)
+    if hi > 30.0:
+        heat_penalty = min(15.0, ((hi - 30.0) / 15.0) * 15.0)
+    else:
+        heat_penalty = 0.0
+
+    # 5. Thunderstorm active penalty
+    storm_penalty = 20.0 if (200 <= int(weather_id) <= 232) else 0.0
+
+    total_deductions = rain_penalty + temp_penalty + wind_penalty + heat_penalty + storm_penalty
+    score = max(0, min(100, round(base - total_deductions)))
+
+    if score >= 80:
+        rating = "Excellent"
+        badge_class = "risk-badge-low"
+        color = "#22c55e"
+        summary = "Ideal conditions for outdoor sports, events, and dining."
+    elif score >= 60:
+        rating = "Good"
+        badge_class = "risk-badge-good"
+        color = "#84cc16"
+        summary = "Favorable weather with mild atmospheric factors."
+    elif score >= 40:
+        rating = "Fair"
+        badge_class = "risk-badge-med"
+        color = "#f59e0b"
+        summary = "Moderate weather impact; prepare accordingly."
+    else:
+        rating = "Poor"
+        badge_class = "risk-badge-crit"
+        color = "#ef4444"
+        summary = "Unfavorable outdoor conditions; indoor activities advised."
+
+    return {
+        "score": score,
+        "rating": rating,
+        "badge_class": badge_class,
+        "color": color,
+        "summary": summary,
+        "deductions": {
+            "rain": round(rain_penalty, 1),
+            "temp": round(temp_penalty, 1),
+            "wind": round(wind_penalty, 1),
+            "heat": round(heat_penalty, 1),
+            "storm": round(storm_penalty, 1),
+        }
+    }
+
+
+# ── Shared Weather Context Pipeline ───────────────────────────────────────────
+def fetch_weather_core_context(city: str = "Delhi", lat: float = None, lon: float = None) -> dict:
+    """
+    Unified core weather fetching & preprocessing pipeline.
+    Shared by /weather and /intelligence to guarantee zero code drift.
+    """
     if lat and lon:
         loc_params = {"lat": lat, "lon": lon, "units": "metric"}
     else:
         loc_params = {"q": city, "units": "metric"}
 
-    # ── Current weather ────────────────────────────────────────────────────────
     current = owm_get(f"{OWM_BASE}/weather", {**loc_params})
     if not current:
-        return render_template("weather.html", error=f"City '{city}' not found.", city=city)
+        return {
+            "error": f"Location '{city}' could not be resolved.",
+            "city": city,
+            "country": "",
+            "lat": float(lat) if lat else 28.6139,
+            "lon": float(lon) if lon else 77.2090,
+        }
 
-    # Extract coordinates for subsequent calls
     coord_lat = current["coord"]["lat"]
     coord_lon = current["coord"]["lon"]
+    city_name = current.get("name") or city
+    country   = current.get("sys", {}).get("country", "")
+    timezone  = current.get("timezone", 0)  # seconds offset from UTC
 
-    # ── 5-day / 3-hour forecast ────────────────────────────────────────────────
     forecast_data = owm_get(f"{OWM_BASE}/forecast", {"lat": coord_lat, "lon": coord_lon, "units": "metric"})
+    aqi_data      = owm_get(f"{OWM_BASE}/air_pollution", {"lat": coord_lat, "lon": coord_lon})
 
-    # ── Air quality ────────────────────────────────────────────────────────────
-    aqi_data = owm_get(f"{OWM_BASE}/air_pollution", {"lat": coord_lat, "lon": coord_lon})
-
-    # ── Process current weather ────────────────────────────────────────────────
-    icon_code   = current["weather"][0]["icon"]
-    description = current["weather"][0]["description"].title()
     temp        = round(current["main"]["temp"])
+    temp_float  = current["main"]["temp"]
     feels_like  = round(current["main"]["feels_like"])
     temp_min    = round(current["main"]["temp_min"])
     temp_max    = round(current["main"]["temp_max"])
     humidity    = current["main"]["humidity"]
     pressure    = current["main"]["pressure"]
-    wind_speed  = round(current["wind"]["speed"] * 3.6, 1)   # m/s → km/h
+    wind_speed  = round(current["wind"]["speed"] * 3.6, 1)  # m/s -> km/h
     wind_deg    = current["wind"].get("deg", 0)
     visibility  = round(current.get("visibility", 10000) / 1000, 1)
     sunrise_ts  = current.get("sys", {}).get("sunrise", 0)
     sunset_ts   = current.get("sys", {}).get("sunset", 0)
-    city_name   = current.get("name") or city
-    country     = current.get("sys", {}).get("country", "")
-    timezone    = current["timezone"]          # seconds offset from UTC
+    weather_id  = current["weather"][0]["id"]
+    description = current["weather"][0]["description"].title()
+    icon_code   = current["weather"][0]["icon"]
+    icon_cls    = weather_icon_class(icon_code)
 
-    # Last updated timestamp (local time of the city)
-    from datetime import timezone as tz
     import datetime as dt_module
     utc_now = dt_module.datetime.now(dt_module.UTC)
     city_offset = dt_module.timedelta(seconds=timezone)
     city_now = utc_now + city_offset
     last_updated = city_now.strftime("%H:%M, %a %d %b")
+    today_str = city_now.strftime("%Y-%m-%d")
 
-    # Wind direction text
     dirs = ["N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSW","SW","WSW","W","WNW","NW","NNW"]
     wind_dir = dirs[round(wind_deg / 22.5) % 16]
 
-    # ── Process forecast into: daily summary + per-day hourly breakdown ────────
-    # Use city's LOCAL date (not UTC) so "Today" card matches what the user sees
-    today_str = city_now.strftime("%Y-%m-%d")
+    raw_slots = forecast_data.get("list", []) if forecast_data else []
+    day_slots_map = {}
+    for item in raw_slots:
+        date_str = item["dt_txt"].split(" ")[0]
+        if date_str not in day_slots_map:
+            day_slots_map[date_str] = []
+        day_slots_map[date_str].append(item)
 
-    # Build a dict: date_str → list of 3-hour slots (hourly_items)
-    day_slots_map = {}   # date → [slot, ...]
-    if forecast_data:
-        for item in forecast_data["list"]:
-            date_str = item["dt_txt"].split(" ")[0]
-            if date_str not in day_slots_map:
-                day_slots_map[date_str] = []
-            day_slots_map[date_str].append(item)
-
-    # Build daily summary list (max 5 days)
     daily_list = []
     for date_str, slots in list(day_slots_map.items())[:5]:
         highs = [s["main"]["temp_max"] for s in slots]
@@ -277,7 +860,6 @@ def weather_dashboard():
         precips = [s.get("pop", 0) for s in slots]
         icon_c = max(set(icons), key=icons.count)
 
-        # Per-day hourly breakdown for expandable rows
         day_hourly = []
         for s in slots:
             ic = s["weather"][0]["icon"]
@@ -302,7 +884,6 @@ def weather_dashboard():
             "hourly":     day_hourly,
         })
 
-    # Today hi/lo from forecast (more accurate than current weather min/max)
     today_forecast = day_slots_map.get(today_str)
     if today_forecast:
         today_high = round(max(s["main"]["temp_max"] for s in today_forecast))
@@ -311,26 +892,23 @@ def weather_dashboard():
         today_high = temp_max
         today_low  = temp_min
 
-    # ── Process hourly (next 48h = 16 slots of 3-hour intervals) ─────────────
     hourly_list = []
-    if forecast_data:
-        for item in forecast_data["list"][:16]:
-            ic = item["weather"][0]["icon"]
-            hourly_list.append({
-                "dt_txt":     item["dt_txt"],
-                "time":       item["dt_txt"].split(" ")[1][:5],
-                "temp":       round(item["main"]["temp"]),
-                "icon_code":  ic,
-                "icon_class": weather_icon_class(ic),
-                "precip":     round(item.get("pop", 0) * 100),
-                "desc":       item["weather"][0]["description"].title(),
-                "wind_speed": round(item["wind"]["speed"] * 3.6, 1),
-                "wind_deg":   item["wind"].get("deg", 0),
-                "humidity":   item["main"]["humidity"],
-                "clouds":     item.get("clouds", {}).get("all", 0),
-            })
+    for item in raw_slots[:16]:
+        ic = item["weather"][0]["icon"]
+        hourly_list.append({
+            "dt_txt":     item["dt_txt"],
+            "time":       item["dt_txt"].split(" ")[1][:5],
+            "temp":       round(item["main"]["temp"]),
+            "icon_code":  ic,
+            "icon_class": weather_icon_class(ic),
+            "precip":     round(item.get("pop", 0) * 100),
+            "desc":       item["weather"][0]["description"].title(),
+            "wind_speed": round(item["wind"]["speed"] * 3.6, 1),
+            "wind_deg":   item["wind"].get("deg", 0),
+            "humidity":   item["main"]["humidity"],
+            "clouds":     item.get("clouds", {}).get("all", 0),
+        })
 
-    # ── AQI ────────────────────────────────────────────────────────────────────
     aqi_index = 1
     aqi_info  = aqi_label(1)
     aqi_components = {}
@@ -339,15 +917,18 @@ def weather_dashboard():
         aqi_info       = aqi_label(aqi_index)
         aqi_components = aqi_data["list"][0]["components"]
 
-    # ── Moon phase (pure math, no API) ────────────────────────────────────────
     moon = compute_moon_phase(utc_now)
+    condition_image = get_weather_condition_image(weather_id, icon_code)
+    country_flag = get_country_flag(country)
 
-    ctx = {
+    return {
         "city":           city_name,
         "country":        country,
+        "country_flag":   country_flag,
         "lat":            coord_lat,
         "lon":            coord_lon,
         "temp":           temp,
+        "temp_float":     temp_float,
         "feels_like":     feels_like,
         "temp_min":       temp_min,
         "temp_max":       temp_max,
@@ -361,11 +942,16 @@ def weather_dashboard():
         "visibility":     visibility,
         "description":    description,
         "icon_code":      icon_code,
-        "icon_class":     weather_icon_class(icon_code),
+        "icon_class":     icon_cls,
+        "weather_id":     weather_id,
         "sunrise_ts":     sunrise_ts,
         "sunset_ts":      sunset_ts,
         "timezone":       timezone,
+        "city_now":       city_now,
+        "today_str":      today_str,
         "last_updated":   last_updated,
+        "forecast_data":  forecast_data,
+        "raw_slots":      raw_slots,
         "daily":          daily_list,
         "hourly":         hourly_list,
         "aqi_index":      aqi_index,
@@ -373,8 +959,244 @@ def weather_dashboard():
         "aqi_color":      aqi_info["color"],
         "aqi_components": aqi_components,
         "moon":           moon,
+        "condition_image": condition_image,
     }
-    return render_template("weather.html", **ctx)
+
+
+# ── Pages ──────────────────────────────────────────────────────────────────────
+@app.route("/", methods=["GET"])
+def index():
+    """GOOD WEATHER landing page."""
+    return render_template("index.html")
+
+
+@app.route("/intelligence", methods=["GET"])
+def weather_intelligence():
+    """
+    AI Weather Intelligence Page:
+    - In-page tab navigation (Overview / Prediction / Trends)
+    - Hero current conditions & 3-hour Short-Term Outlook
+    - 4 Bento-style Risk Cards (Rain, Thunderstorm, Heat Stress, Outdoor Activity Score)
+    - 6-Tab MSN Hourly Widget & 7-Day Day Strip (reused from weather)
+    - Air Quality & Sun-Moon Cards (reused from weather)
+    - 24-48 Hour dual-axis forecast trajectory chart
+    - Today's ML rain prediction card (hybrid custom_model / owm_forecast)
+    - 4-tab climate trends system with historical normals comparison
+    """
+    city = request.args.get("city", "Delhi")
+    lat  = request.args.get("lat", None)
+    lon  = request.args.get("lon", None)
+
+    core = fetch_weather_core_context(city, lat, lon)
+    if "error" in core:
+        return render_template("intelligence.html", **core)
+
+    raw_slots = core.get("raw_slots", [])
+    timezone = core["timezone"]
+    import datetime as dt_module
+
+    # Short-Term Outlook (next 4-5 slots = ~12-15 hours)
+    short_term_slots = []
+    for s in raw_slots[:5]:
+        slot_dt_utc = dt_module.datetime.fromtimestamp(s["dt"], dt_module.UTC)
+        slot_local = slot_dt_utc + dt_module.timedelta(seconds=timezone)
+        slot_pop_pct = round(s.get("pop", 0.0) * 100)
+        short_term_slots.append({
+            "time_label": slot_local.strftime("%H:%M"),
+            "full_time_label": slot_local.strftime("%a %H:%M"),
+            "dt_txt": s["dt_txt"],
+            "temp": round(s["main"]["temp"]),
+            "pop_pct": slot_pop_pct,
+            "weather_id": s["weather"][0]["id"],
+            "desc": s["weather"][0]["description"].title(),
+            "icon_code": s["weather"][0]["icon"],
+            "icon_class": weather_icon_class(s["weather"][0]["icon"]),
+        })
+
+    if short_term_slots:
+        peak_short_slot = max(short_term_slots, key=lambda x: x["pop_pct"])
+        peak_short_pop  = peak_short_slot["pop_pct"]
+        peak_short_time = peak_short_slot["time_label"]
+    else:
+        peak_short_pop  = 0
+        peak_short_time = "N/A"
+
+    # Process 24-48 Hour Forecast (up to 16 slots = 48 hours)
+    hourly_48h = []
+    for s in raw_slots[:16]:
+        slot_dt_utc = dt_module.datetime.fromtimestamp(s["dt"], dt_module.UTC)
+        slot_local = slot_dt_utc + dt_module.timedelta(seconds=timezone)
+        slot_pop_pct = round(s.get("pop", 0.0) * 100)
+        hourly_48h.append({
+            "time_label": slot_local.strftime("%a %H:%M"),
+            "hour_label": slot_local.strftime("%H:%M"),
+            "date_short": slot_local.strftime("%d %b"),
+            "dt_txt": s["dt_txt"],
+            "temp": round(s["main"]["temp"], 1),
+            "feels_like": round(s["main"].get("feels_like", s["main"]["temp"]), 1),
+            "pop_pct": slot_pop_pct,
+            "humidity": s["main"]["humidity"],
+            "wind_speed": round(s["wind"]["speed"] * 3.6, 1),
+            "desc": s["weather"][0]["description"].title(),
+            "icon_code": s["weather"][0]["icon"],
+            "icon_class": weather_icon_class(s["weather"][0]["icon"]),
+        })
+
+    if hourly_48h:
+        peak_48h_slot = max(hourly_48h, key=lambda x: x["pop_pct"])
+        peak_48h_pop  = peak_48h_slot["pop_pct"]
+        peak_48h_time = peak_48h_slot["time_label"]
+    else:
+        peak_48h_pop  = 0
+        peak_48h_time = "N/A"
+
+    # Bento Risk Cards
+    immed_rain_pop = max((s["pop_pct"] for s in short_term_slots[:2]), default=0)
+    if immed_rain_pop < 25:
+        rain_risk_tier, rain_risk_badge, rain_risk_color = "Low", "risk-badge-low", "#22c55e"
+    elif immed_rain_pop < 60:
+        rain_risk_tier, rain_risk_badge, rain_risk_color = "Medium", "risk-badge-med", "#f59e0b"
+    else:
+        rain_risk_tier, rain_risk_badge, rain_risk_color = "High", "risk-badge-crit", "#ef4444"
+
+    rain_risk = {
+        "tier": rain_risk_tier,
+        "badge_class": rain_risk_badge,
+        "color": rain_risk_color,
+        "pop_pct": immed_rain_pop,
+        "text": f"{immed_rain_pop}% chance of rain in the next few hours",
+        "peak_note": f"Peak {peak_short_pop}% at {peak_short_time}" if peak_short_pop > 0 else "Clear outlook ahead",
+    }
+
+    thunderstorm_risk = compute_thunderstorm_risk(core["weather_id"], raw_slots[:5])
+    heat_stress = compute_heat_index(core["temp_float"], core["humidity"])
+    outdoor_activity = compute_outdoor_activity_score(
+        temp_c       = core["temp_float"],
+        wind_kmh     = core["wind_speed"],
+        rain_pop_pct = immed_rain_pop,
+        heat_index_c = heat_stress["heat_index_c"],
+        weather_id   = core["weather_id"],
+    )
+
+    in_coverage, nearest_city, distance_km = is_in_trained_coverage(core["lat"], core["lon"])
+    if in_coverage:
+        model_attribution = f"CatBoost Decision Forest (Regional ML Station: {nearest_city}, {int(distance_km)}km)"
+    else:
+        model_attribution = "Global High-Resolution Ensemble (OWM NWP Model)"
+
+    ai_content = generate_ai_weather_intelligence_content(
+        city              = core["city"],
+        country           = core["country"],
+        temp              = core["temp"],
+        feels_like        = core["feels_like"],
+        description       = core["description"],
+        pop_pct           = immed_rain_pop,
+        peak_short_pop    = peak_short_pop,
+        peak_short_time   = peak_short_time,
+        wind_speed        = core["wind_speed"],
+        heat_stress       = heat_stress,
+        outdoor_activity  = outdoor_activity,
+        thunderstorm_risk = thunderstorm_risk,
+    )
+
+    # ── Today's ML Prediction Preview (for Prediction Tab) ─────────────────────
+    try:
+        feat = derive_features_from_owm(core["city"], core["lat"], core["lon"], core["today_str"])
+        if in_coverage:
+            data = CustomData(
+                temperature_2m_max          = feat["temperature_2m_max"],
+                temperature_2m_min          = feat["temperature_2m_min"],
+                apparent_temperature_max    = feat["apparent_temperature_max"],
+                apparent_temperature_min    = feat["apparent_temperature_min"],
+                precipitation_sum           = feat["precipitation_sum"],
+                weather_code                = feat["weather_code"],
+                wind_speed_10m_max          = feat["wind_speed_10m_max"],
+                wind_gusts_10m_max          = feat["wind_gusts_10m_max"],
+                wind_direction_10m_dominant = feat["wind_direction_10m_dominant"],
+                rain_today                  = feat["rain_today"],
+                day                         = feat["day"],
+                month                       = feat["month"],
+                year                        = feat["year"],
+                city                        = nearest_city,
+            )
+            pipeline = PredictPipeline()
+            prediction_today = pipeline.predict_advanced(data.get_data_as_dataframe())[0]
+            prediction_today["prediction_source"] = "custom_model"
+            prediction_today["source_label"] = (
+                f"Trained ML model (within {int(distance_km)}km of {nearest_city})"
+            )
+            prediction_today["nearest_city"] = nearest_city
+            prediction_today["distance_km"] = distance_km
+        else:
+            fc_data = feat.get("forecast_data")
+            day_pops = []
+            if fc_data and "list" in fc_data:
+                for slot in fc_data["list"]:
+                    if slot["dt_txt"].split(" ")[0] == core["today_str"]:
+                        day_pops.append(slot.get("pop", 0.0))
+            pop = max(day_pops) if day_pops else 0.0
+            prediction_today = owm_pop_to_prediction(pop, nearest_city, distance_km)
+
+        prediction_today["features"] = feat
+    except Exception as exc:
+        logger.warning(f"Could not compute prediction_today for {core['city']}: {exc}")
+        prediction_today = {
+            "prediction": "No" if immed_rain_pop < 50 else "Yes",
+            "probability": immed_rain_pop,
+            "confidence": 75.0,
+            "risk_level": rain_risk_tier,
+            "risk_color": rain_risk_color,
+            "risk_bg": "rgba(34,197,94,0.12)",
+            "risk_border": "rgba(34,197,94,0.35)",
+            "prediction_source": "owm_forecast",
+            "source_label": f"OpenWeatherMap forecast fallback ({int(distance_km)}km from {nearest_city})",
+            "nearest_city": nearest_city,
+            "distance_km": distance_km,
+            "features": {},
+        }
+
+    # ── Historical Climate Normal Matching (for Trends Tab) ───────────────────
+    hist_city = find_hist_city(core["city"])
+    hist_cities = sorted(HIST_AVG.keys())
+    has_hist = (hist_city is not None)
+
+    context = {
+        **core,
+        "short_term_slots": short_term_slots,
+        "peak_short_pop": peak_short_pop,
+        "peak_short_time": peak_short_time,
+        "hourly_48h": hourly_48h,
+        "peak_48h_pop": peak_48h_pop,
+        "peak_48h_time": peak_48h_time,
+        "rain_risk": rain_risk,
+        "thunderstorm_risk": thunderstorm_risk,
+        "heat_stress": heat_stress,
+        "outdoor_activity": outdoor_activity,
+        "model_attribution": model_attribution,
+        "in_coverage": in_coverage,
+        "nearest_city": nearest_city,
+        "distance_km": distance_km,
+        "ai_content": ai_content,
+        "prediction_today": prediction_today,
+        "hist_city": hist_city,
+        "hist_cities": hist_cities,
+        "has_hist": has_hist,
+    }
+
+    return render_template("intelligence.html", **context)
+
+
+@app.route("/weather", methods=["GET"])
+def weather_dashboard():
+    """Full weather dashboard for a given city (internal/shared backend)."""
+    city = request.args.get("city", "London")
+    lat  = request.args.get("lat", None)
+    lon  = request.args.get("lon", None)
+
+    core = fetch_weather_core_context(city, lat, lon)
+    if "error" in core:
+        return render_template("weather.html", **core)
+    return render_template("weather.html", **core)
 
 
 
@@ -565,11 +1387,13 @@ def derive_features_from_owm(
         "year":                        target_dt.year,
         "city":                        resolved_city,
         # ── Display & Metadata ───────────────────────────────────────────────
-        "resolved_city": resolved_city,
-        "lat":           coord_lat,
-        "lon":           coord_lon,
-        "country":       current.get("sys", {}).get("country", ""),
-        "date_str":      target_date_str,
+        "resolved_city":   resolved_city,
+        "lat":             coord_lat,
+        "lon":             coord_lon,
+        "country":         current.get("sys", {}).get("country", ""),
+        "date_str":        target_date_str,
+        # ── Raw forecast data for OWM-fallback pop extraction ────────────────
+        "forecast_data":   forecast_data,
     }
 
 
@@ -591,55 +1415,89 @@ def predict():
 
         feat = derive_features_from_owm(city, lat, lon, target_date)
 
-        data = CustomData(
-            temperature_2m_max          = feat["temperature_2m_max"],
-            temperature_2m_min          = feat["temperature_2m_min"],
-            apparent_temperature_max    = feat["apparent_temperature_max"],
-            apparent_temperature_min    = feat["apparent_temperature_min"],
-            precipitation_sum           = feat["precipitation_sum"],
-            weather_code                = feat["weather_code"],
-            wind_speed_10m_max          = feat["wind_speed_10m_max"],
-            wind_gusts_10m_max          = feat["wind_gusts_10m_max"],
-            wind_direction_10m_dominant = feat["wind_direction_10m_dominant"],
-            rain_today                  = feat["rain_today"],
-            day                         = feat["day"],
-            month                       = feat["month"],
-            year                        = feat["year"],
-            city                        = feat["city"],
+        # ── Coverage check: custom model vs OWM fallback ───────────────────────
+        in_coverage, nearest_city, distance_km = is_in_trained_coverage(
+            feat["lat"], feat["lon"]
         )
 
-        df = data.get_data_as_dataframe()
-        logger.info(f"Auto-derived Input DataFrame:\n{df.to_string()}")
+        if in_coverage:
+            # ── Custom model branch ──────────────────────────────────────────
+            # Force city to matched trained name to avoid OHE failures from
+            # OWM returning variant names (e.g. "New Delhi" instead of "Delhi").
+            data = CustomData(
+                temperature_2m_max          = feat["temperature_2m_max"],
+                temperature_2m_min          = feat["temperature_2m_min"],
+                apparent_temperature_max    = feat["apparent_temperature_max"],
+                apparent_temperature_min    = feat["apparent_temperature_min"],
+                precipitation_sum           = feat["precipitation_sum"],
+                weather_code                = feat["weather_code"],
+                wind_speed_10m_max          = feat["wind_speed_10m_max"],
+                wind_gusts_10m_max          = feat["wind_gusts_10m_max"],
+                wind_direction_10m_dominant = feat["wind_direction_10m_dominant"],
+                rain_today                  = feat["rain_today"],
+                day                         = feat["day"],
+                month                       = feat["month"],
+                year                        = feat["year"],
+                city                        = nearest_city,  # forced trained name
+            )
+            df = data.get_data_as_dataframe()
+            logger.info(f"Auto-derived Input DataFrame:\n{df.to_string()}")
+            pipeline = PredictPipeline()
+            result = pipeline.predict_advanced(df)[0]
+            result["prediction_source"] = "custom_model"
+            result["source_label"]      = (
+                f"Predicted by our trained ML model "
+                f"(within {int(distance_km)}km of {nearest_city})"
+            )
+            result["nearest_city"]  = nearest_city
+            result["distance_km"]   = distance_km
 
-        pipeline = PredictPipeline()
-        adv = pipeline.predict_advanced(df)
-        result = adv[0]
+        else:
+            # ── OWM fallback branch ──────────────────────────────────────────
+            # Extract max pop across the day's 3-hour slots — conservative
+            # (worst-case for the day), consistent with how we use max(wind).
+            forecast_data = feat.get("forecast_data")
+            day_pops = []
+            if forecast_data and "list" in forecast_data:
+                for slot in forecast_data["list"]:
+                    if slot["dt_txt"].split(" ")[0] == target_date:
+                        day_pops.append(slot.get("pop", 0.0))
+            pop = max(day_pops) if day_pops else 0.0
+            logger.info(
+                f"OWM fallback for {feat['resolved_city']}: "
+                f"pop slots={day_pops} → max_pop={pop:.3f}"
+            )
+            result = owm_pop_to_prediction(pop, nearest_city, distance_km)
 
         # Log prediction to feedback tracker for production monitoring
         log_prediction_feedback(
-            city        = feat["resolved_city"],
-            lat         = feat["lat"],
-            lon         = feat["lon"],
-            date_str    = feat["date_str"],
-            prediction  = result["prediction"],
-            probability = result["probability"],
-            confidence  = result["confidence"],
-            features    = feat,
+            city              = feat["resolved_city"],
+            lat               = feat["lat"],
+            lon               = feat["lon"],
+            date_str          = feat["date_str"],
+            prediction        = result["prediction"],
+            probability       = result["probability"],
+            confidence        = result["confidence"],
+            features          = feat,
+            prediction_source = result["prediction_source"],
         )
 
         return render_template(
             "result.html",
-            prediction   = result["prediction"],
-            probability  = result["probability"],
-            confidence   = result["confidence"],
-            risk_level   = result["risk_level"],
-            risk_color   = result["risk_color"],
-            risk_bg      = result["risk_bg"],
-            risk_border  = result["risk_border"],
-            features     = feat,
-            city         = feat["resolved_city"],
-            country      = feat["country"],
-            date         = feat["date_str"],
+            prediction        = result["prediction"],
+            probability       = result["probability"],
+            confidence        = result["confidence"],
+            risk_level        = result["risk_level"],
+            risk_color        = result["risk_color"],
+            risk_bg           = result["risk_bg"],
+            risk_border       = result["risk_border"],
+            prediction_source = result["prediction_source"],
+            source_label      = result["source_label"],
+            nearest_city      = result["nearest_city"],
+            features          = feat,
+            city              = feat["resolved_city"],
+            country           = feat["country"],
+            date              = feat["date_str"],
         )
 
     except Exception as e:
@@ -659,41 +1517,90 @@ def predict_multi():
         pipeline = PredictPipeline()
         days_results = []
 
+        # ── Coverage check runs ONCE per city — same location all 5 days ──────
+        # We derive features for day 0 first to get resolved coordinates,
+        # then check coverage once and apply to all days in the loop.
+        _first_feat = None
+        _in_coverage = None
+        _nearest_city = None
+        _distance_km = None
+
         for offset in range(5):
-            target_dt = datetime.now() + timedelta(days=offset)
+            target_dt   = datetime.now() + timedelta(days=offset)
             target_date = target_dt.strftime("%Y-%m-%d")
             try:
                 feat = derive_features_from_owm(city, lat, lon, target_date)
-                data = CustomData(
-                    temperature_2m_max          = feat["temperature_2m_max"],
-                    temperature_2m_min          = feat["temperature_2m_min"],
-                    apparent_temperature_max    = feat["apparent_temperature_max"],
-                    apparent_temperature_min    = feat["apparent_temperature_min"],
-                    precipitation_sum           = feat["precipitation_sum"],
-                    weather_code                = feat["weather_code"],
-                    wind_speed_10m_max          = feat["wind_speed_10m_max"],
-                    wind_gusts_10m_max          = feat["wind_gusts_10m_max"],
-                    wind_direction_10m_dominant = feat["wind_direction_10m_dominant"],
-                    rain_today                  = feat["rain_today"],
-                    day                         = feat["day"],
-                    month                       = feat["month"],
-                    year                        = feat["year"],
-                    city                        = feat["city"],
-                )
-                df = data.get_data_as_dataframe()
-                adv = pipeline.predict_advanced(df)
-                result = adv[0]
-                result["features"]    = feat
-                result["date"]        = target_date
-                result["day_label"]   = "Today" if offset == 0 else target_dt.strftime("%A")
-                result["date_short"]  = target_dt.strftime("%d %b")
+
+                # Run coverage check on first day (coords are stable across days)
+                if _in_coverage is None:
+                    _in_coverage, _nearest_city, _distance_km = is_in_trained_coverage(
+                        feat["lat"], feat["lon"]
+                    )
+                    _first_feat = feat
+
+                if _in_coverage:
+                    # ── Custom model branch ──────────────────────────────────
+                    data = CustomData(
+                        temperature_2m_max          = feat["temperature_2m_max"],
+                        temperature_2m_min          = feat["temperature_2m_min"],
+                        apparent_temperature_max    = feat["apparent_temperature_max"],
+                        apparent_temperature_min    = feat["apparent_temperature_min"],
+                        precipitation_sum           = feat["precipitation_sum"],
+                        weather_code                = feat["weather_code"],
+                        wind_speed_10m_max          = feat["wind_speed_10m_max"],
+                        wind_gusts_10m_max          = feat["wind_gusts_10m_max"],
+                        wind_direction_10m_dominant = feat["wind_direction_10m_dominant"],
+                        rain_today                  = feat["rain_today"],
+                        day                         = feat["day"],
+                        month                       = feat["month"],
+                        year                        = feat["year"],
+                        city                        = _nearest_city,  # forced trained name
+                    )
+                    df = data.get_data_as_dataframe()
+                    result = pipeline.predict_advanced(df)[0]
+                    result["prediction_source"] = "custom_model"
+                    result["source_label"]      = (
+                        f"Trained ML model "
+                        f"(within {int(_distance_km)}km of {_nearest_city})"
+                    )
+
+                else:
+                    # ── OWM fallback branch ──────────────────────────────────
+                    forecast_data = feat.get("forecast_data")
+                    day_pops = []
+                    if forecast_data and "list" in forecast_data:
+                        for slot in forecast_data["list"]:
+                            if slot["dt_txt"].split(" ")[0] == target_date:
+                                day_pops.append(slot.get("pop", 0.0))
+                    pop = max(day_pops) if day_pops else 0.0
+                    result = owm_pop_to_prediction(pop, _nearest_city, _distance_km)
+
+                result["features"]   = feat
+                result["date"]       = target_date
+                result["day_label"]  = "Today" if offset == 0 else target_dt.strftime("%A")
+                result["date_short"] = target_dt.strftime("%d %b")
                 days_results.append(result)
+
+                # Log each day to feedback tracker
+                log_prediction_feedback(
+                    city              = feat["resolved_city"],
+                    lat               = feat["lat"],
+                    lon               = feat["lon"],
+                    date_str          = feat["date_str"],
+                    prediction        = result["prediction"],
+                    probability       = result["probability"],
+                    confidence        = result["confidence"],
+                    features          = feat,
+                    prediction_source = result["prediction_source"],
+                )
+
             except Exception as ex:
                 logger.warning(f"Could not predict for {target_date}: {ex}")
                 days_results.append({
                     "prediction": "N/A", "probability": 0, "confidence": 0,
                     "risk_level": "Unknown", "risk_color": "#6b7280",
                     "risk_bg": "rgba(107,114,128,0.12)", "risk_border": "rgba(107,114,128,0.35)",
+                    "prediction_source": "unknown", "source_label": "Prediction unavailable",
                     "date": target_date, "day_label": target_dt.strftime("%A"),
                     "date_short": target_dt.strftime("%d %b"), "features": {},
                 })
@@ -710,55 +1617,21 @@ def predict_multi():
         raise WeatherException(e, sys)
 
 
-# ── /trends — HTML page ────────────────────────────────────────────────────────
+# ── /trends — Redirect to Unified /intelligence#trends ───────────────────────
 @app.route("/trends", methods=["GET"])
 def trends_page():
     """
-    Render the climate trends HTML page for a given city.
-    Resolves the city the same way as /weather; then renders trends.html.
-    Query params: city, lat (optional), lon (optional)
+    Redirect /trends directly to the Trends tab inside /intelligence.
+    Ensures seamless backward compatibility and eliminates duplicate page maintenance.
     """
     city = request.args.get("city", "Delhi")
     lat  = request.args.get("lat", None)
     lon  = request.args.get("lon", None)
 
+    qs = f"city={city}"
     if lat and lon:
-        loc_params = {"lat": lat, "lon": lon, "units": "metric"}
-    else:
-        loc_params = {"q": city, "units": "metric"}
-
-    current = owm_get(f"{OWM_BASE}/weather", {**loc_params})
-    if not current:
-        return render_template(
-            "trends.html",
-            error=f"City '{city}' not found.",
-            city=city, country="",
-            lat=28.6139, lon=77.2090,
-            hist_cities=sorted(HIST_AVG.keys()),
-        )
-
-    city_name  = current.get("name") or city
-    country    = current.get("sys", {}).get("country", "")
-    coord_lat  = current["coord"]["lat"]
-    coord_lon  = current["coord"]["lon"]
-
-    # Check whether this city has historical data (case-insensitive)
-    hist_city = None
-    for k in HIST_AVG:
-        if k.lower() == city_name.lower():
-            hist_city = k
-            break
-
-    return render_template(
-        "trends.html",
-        city=city_name,
-        country=country,
-        lat=coord_lat,
-        lon=coord_lon,
-        hist_city=hist_city,          # matched key in HIST_AVG, or None
-        hist_cities=sorted(HIST_AVG.keys()),
-        has_hist=(hist_city is not None),
-    )
+        qs += f"&lat={lat}&lon={lon}"
+    return redirect(f"/intelligence?{qs}#trends", code=302)
 
 
 # ── /api/trends — Historical climate normals JSON ─────────────────────────────
@@ -802,21 +1675,16 @@ def api_trends_data():
     if not city:
         return jsonify({"error": "city param required"}), 400
 
-    city_data = HIST_AVG.get(city)
-    if city_data is None:
-        # Try case-insensitive fallback
-        city_lower = city.lower()
-        for k in HIST_AVG:
-            if k.lower() == city_lower:
-                city_data = HIST_AVG[k]
-                city = k
-                break
-        if city_data is None:
-            available = sorted(HIST_AVG.keys())
-            return jsonify({
-                "error": f"City '{city}' not in historical dataset.",
-                "available_cities": available
-            }), 404
+    matched_city = find_hist_city(city)
+    if not matched_city:
+        available = sorted(HIST_AVG.keys())
+        return jsonify({
+            "error": f"City '{city}' not in historical dataset.",
+            "available_cities": available
+        }), 404
+
+    city_data = HIST_AVG[matched_city]
+    city = matched_city
 
     # Collect doy range, wrapping around year end (e.g. 350 → 365 → 1 → 15)
     data = []

@@ -44,7 +44,7 @@ CITY_COORDS = {
     "Pune":      {"lat": 18.5204, "lon": 73.8567},
     "Ahmedabad": {"lat": 23.0225, "lon": 72.5714},
     "Jaipur":    {"lat": 26.9124, "lon": 75.7873},
-    "Surat":     {"lat": 21.1702, "lon": 72.8311},
+    "Lucknow":   {"lat": 26.8467, "lon": 80.9462},  # verified against dataset CSV
 }
 
 # ── Feature Columns ────────────────────────────────────────────────────────────

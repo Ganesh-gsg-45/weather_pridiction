@@ -119,6 +119,25 @@
       color: {{ risk_color }};
     }
 
+    /* ── SOURCE BADGE ────────────────────────────────────────────────────── */
+    .source-badge {
+      display: inline-flex; align-items: center; gap: 0.45rem;
+      padding: 0.3rem 0.85rem;
+      border-radius: 999px;
+      font-size: 0.72rem; font-weight: 600; letter-spacing: 0.02em;
+      margin-top: 0.25rem;
+    }
+    .source-badge.model {
+      background: rgba(6,182,212,0.1);
+      border: 1px solid rgba(6,182,212,0.3);
+      color: #06b6d4;
+    }
+    .source-badge.fallback {
+      background: rgba(245,158,11,0.1);
+      border: 1px solid rgba(245,158,11,0.28);
+      color: #f59e0b;
+    }
+
     /* ── PROBABILITY GAUGE ───────────────────────────────────────────────── */
     .gauge-wrap {
       display: flex; flex-direction: column; align-items: center; gap: 0.5rem;
@@ -342,18 +361,35 @@
         <p class="result-eyebrow">AI Rain Prediction Result</p>
 
         {% if prediction == "Yes" %}
-        <h1 class="result-headline rain pulse">Rain Tomorrow!</h1>
+        <h1 class="result-headline rain pulse">Rain Probability: {{ probability }}%</h1>
         <p class="result-sub">
-          Our CatBoost ML model predicts <strong>rainfall in {{ city }}</strong> on {{ date }}.<br/>
-          Plan accordingly — an umbrella is strongly recommended.
+          {% if prediction_source == 'custom_model' %}
+            Our CatBoost ML model predicts <strong>rainfall in {{ city }}</strong> on {{ date }}.<br/>
+            Plan accordingly — an umbrella is strongly recommended.
+          {% else %}
+            OpenWeatherMap forecast shows <strong>rain likely in {{ city }}</strong> on {{ date }}.<br/>
+            Plan accordingly — an umbrella is strongly recommended.
+          {% endif %}
         </p>
         {% else %}
-        <h1 class="result-headline no-rain pulse">No Rain Tomorrow</h1>
+        <h1 class="result-headline no-rain pulse">Rain Probability: {{ probability }}%</h1>
         <p class="result-sub">
-          Our CatBoost ML model predicts <strong>dry weather in {{ city }}</strong> on {{ date }}.<br/>
-          Enjoy the clear skies — great day to be outdoors!
+          {% if prediction_source == 'custom_model' %}
+            Our CatBoost ML model predicts <strong>dry weather in {{ city }}</strong> on {{ date }}.<br/>
+            Enjoy the clear skies — great day to be outdoors!
+          {% else %}
+            OpenWeatherMap forecast shows <strong>dry weather likely in {{ city }}</strong> on {{ date }}.<br/>
+            Enjoy the clear skies — great day to be outdoors!
+          {% endif %}
         </p>
         {% endif %}
+
+        <div>
+          <span class="source-badge {% if prediction_source == 'custom_model' %}model{% else %}fallback{% endif %}">
+            {% if prediction_source == 'custom_model' %}🤖{% else %}🌐{% endif %}
+            {{ source_label }}
+          </span>
+        </div>
 
         <div>
           <span class="risk-badge">
@@ -541,7 +577,7 @@
     <div class="action-row">
       <a href="/predict-form" class="btn-primary">Run Another Prediction</a>
       <a href="/predict-form?multi=1" class="btn-secondary">5-Day AI Timeline</a>
-      <a href="/weather?city={{ city }}" class="btn-ghost">View Live Weather</a>
+      <a href="/intelligence?city={{ city }}" class="btn-ghost">View Live Weather</a>
     </div>
 
   </div><!-- /page -->

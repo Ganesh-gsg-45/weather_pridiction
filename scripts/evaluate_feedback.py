@@ -15,19 +15,14 @@ sys.stdout.reconfigure(encoding="utf-8")
 
 LOG_FILE = os.path.join("logs", "prediction_feedback.csv")
 
-# Known fallback coordinates for 10 training cities if older log entries lack lat/lon
-CITY_COORDS_FALLBACK = {
-    "Delhi": (28.6139, 77.2090),
-    "Mumbai": (19.0760, 72.8777),
-    "Bangalore": (12.9716, 77.5946),
-    "Chennai": (13.0827, 80.2707),
-    "Kolkata": (22.5726, 88.3639),
-    "Hyderabad": (17.3850, 78.4867),
-    "Ahmedabad": (23.0225, 72.5714),
-    "Jaipur": (26.9124, 75.7873),
-    "Lucknow": (26.8467, 80.9462),
-    "Pune": (18.5204, 73.8567),
-}
+# Single source of truth for trained city coordinates — imported from config.constants.
+# Do NOT redefine this dict here; update config/constants.py instead.
+import sys as _sys, os as _os
+_sys.path.insert(0, _os.path.join(_os.path.dirname(__file__), ".."))
+from config.constants import CITY_COORDS as _CITY_COORDS
+
+# Convert {city: {"lat": ..., "lon": ...}} → {city: (lat, lon)} for legacy tuple access
+CITY_COORDS_FALLBACK = {city: (v["lat"], v["lon"]) for city, v in _CITY_COORDS.items()}
 
 
 def fetch_actual_rain(lat: float, lon: float, date_str: str) -> float:

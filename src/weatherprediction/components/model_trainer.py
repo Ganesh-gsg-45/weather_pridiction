@@ -22,15 +22,10 @@ class ModelTrainerConfig:
 
 
 class ModelTrainer:
-    """
-    Trains all candidate classifiers from the notebook, compares their
-    test-set accuracy, and saves the best model to disk.
-    """
-
-    # ── Minimum acceptable test accuracy ──────────────────────────────────────
+   
     MIN_ACCURACY_THRESHOLD = 0.60
 
-    # ── Candidate models (same set as the notebook) ───────────────────────────
+    
     MODELS = {
         "Logistic Regression":      LogisticRegression(max_iter=500),
         "K-Neighbors Classifier":   KNeighborsClassifier(),
@@ -49,17 +44,7 @@ class ModelTrainer:
         train_arr: np.ndarray,
         test_arr:  np.ndarray,
     ) -> float:
-        """
-        Parameters
-        ----------
-        train_arr : np.ndarray  shape (n_train, n_features + 1)
-        test_arr  : np.ndarray  shape (n_test,  n_features + 1)
-            Last column is the target label.
-
-        Returns
-        -------
-        best_test_accuracy : float
-        """
+     
         logger.info("─── Model Training started ───────────────────────────────")
         try:
             # ── Split features / target ────────────────────────────────────

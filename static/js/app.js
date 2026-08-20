@@ -71,11 +71,11 @@ async function fetchSuggestions(query, dropdown) {
 }
 
 function navigateToCity(city) {
-  window.location.href = `/weather?city=${encodeURIComponent(city)}`;
+  window.location.href = `/intelligence?city=${encodeURIComponent(city)}`;
 }
 
 function navigateToLatLon(lat, lon, name) {
-  window.location.href = `/weather?city=${encodeURIComponent(name)}&lat=${lat}&lon=${lon}`;
+  window.location.href = `/intelligence?city=${encodeURIComponent(name)}&lat=${lat}&lon=${lon}`;
 }
 
 function escHtml(str) {
@@ -100,7 +100,7 @@ function initGeolocation() {
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const { latitude: lat, longitude: lon } = pos.coords;
-        window.location.href = `/weather?lat=${lat}&lon=${lon}`;
+        window.location.href = `/intelligence?lat=${lat}&lon=${lon}`;
       },
       () => {
         btn.textContent = '📍 Location';
@@ -167,7 +167,7 @@ async function initAutoGeolocation() {
   navigator.geolocation.getCurrentPosition(
     (pos) => {
       const { latitude: lat, longitude: lon } = pos.coords;
-      const url = `/weather?lat=${lat}&lon=${lon}`;
+      const url = `/intelligence?lat=${lat}&lon=${lon}`;
       console.log('[AutoGeo] Success — redirecting to:', url);
       window.location.href = url;
     },
